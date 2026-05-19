@@ -190,13 +190,13 @@ Vectors live under [`spec/vectors/`](spec/vectors/) as JSON. Each file includes 
 | Vector | Status | Description |
 |--------|--------|-------------|
 | `001-valid-plaintext.json` | **Published** | `enc=none`, Ed25519 signature, `model@provider` payload |
-| `002-invalid-signature.json` | Planned | Tampered `sig` |
-| `003-replayed-nonce.json` | Planned | Duplicate `(kid, nonce)` |
-| `004-stale-timestamp.json` | Planned | `ts` outside skew window |
-| `005-encrypted-roundtrip.json` | Planned | `enc=xchacha20poly1305` or `A256GCM` |
-| `006-wrong-recipient.json` | Planned | Recipient mismatch at gateway |
-| `007-malformed-canonical.json` | Planned | Non-canonical signed field serialization |
-| `008-invalid-model-id.json` | Planned | Missing or invalid `\@\<provider-slug>` |
+| `002-invalid-signature.json` | **Published** | Tampered `sig` |
+| `003-replayed-nonce.json` | **Published** | Duplicate `(kid, nonce)` |
+| `004-stale-timestamp.json` | **Published** | `ts` outside skew window |
+| `005-encrypted-roundtrip.json` | **Published** | `enc=xchacha20poly1305` |
+| `006-wrong-recipient.json` | **Published** | Recipient mismatch at gateway |
+| `007-malformed-canonical.json` | **Published** | Payload / `payload_hash` mismatch |
+| `008-invalid-model-id.json` | **Published** | Missing or invalid `\@\<provider-slug>` |
 
 Transport hybrid KEX vectors: [`spec/vectors/transport/`](spec/vectors/transport/) (BoringSSL ML-KEM-768, RFC 7748 X25519, composed `X25519MLKEM768`). Run `cargo test -p ope-transport --test official_vectors`.
 
@@ -411,12 +411,15 @@ This repository ships a reference workspace (see [`README.md`](README.md)):
 | Crate | Spec alignment | Status |
 |-------|----------------|--------|
 | `ope-crypto` | §5 primitives | Ed25519, SHA-256, base64url; dev mock keys |
-| `ope-envelope` | §4–8, §11 | Sign/verify, JCS, `enc=none`, OPE-OpenAI model parsing |
-| `ope-transport` | [`spec/ope-transport.md`](spec/ope-transport.md) | `X25519MLKEM768` hybrid KEX (in-process harness; TLS framing planned) |
-| `ope-attest` | §14 | Stub only |
-| `ope-ffi` | Bindings | Minimal C verify hook (dev keys) |
-| `ope-cli` | §12 vectors | `sign`, `verify`, `transport-test`, `keygen` |
+| `ope-envelope` | §4–8, §11 | Sign/verify, encrypt/decrypt, JCS, vectors `001`–`008` |
+| `ope-transport` | [`spec/ope-transport.md`](spec/ope-transport.md) | `X25519MLKEM768` KEX + `derive_record_keys` (HKDF harness) |
+| `ope-http` | Transport §4 | `application/ope+json` framing |
+| `ope-attest` | §14 | Mock attester + attestation sign/verify |
+| `ope-gateway` | §8, §14 | Gateway verify + `model@provider` strip |
+| `ope-server` | §14 | HTTP APIs (`ope serve`) |
+| `ope-ffi` | Bindings | C ABI envelope sign/verify |
+| `ope-cli` | §12 vectors | `gen-vectors`, `serve`, `hkdf-test`, `transport-test` |
 
 **Key separation:** envelope signing uses long-lived Ed25519 keys (`kid`). Transport sessions use ephemeral X25519 + ML-KEM-768 per [draft-ietf-tls-ecdhe-mlkem](https://datatracker.ietf.org/doc/draft-ietf-tls-ecdhe-mlkem/). These MUST NOT be mixed.
 
-**Transport:** Production deployments SHOULD terminate TLS 1.3 with `X25519MLKEM768` (as in Google Chrome / AWS s2n-tls). The Rust `ope-transport` crate implements the hybrid shared-secret combiner for tests; full TLS record encryption is P1 work.
+**Transport:** Production deployments SHOULD terminate TLS 1.3 with `X25519MLKEM768` (as in Google Chrome / AWS s2n-tls). See [`docs/tls-integration.md`](docs/tls-integration.md). The in-repo HKDF helper is for tests; wire TLS uses an external stack.

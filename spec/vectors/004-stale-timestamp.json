@@ -1,0 +1,29 @@
+{
+  "vector_id": "004-stale-timestamp",
+  "description": "Timestamp outside skew window",
+  "dev_only": true,
+  "signing_key_seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+  "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "expect_verify": "fail",
+  "expect_error_substr": "timestamp",
+  "envelope": {
+    "ope_version": "1.0",
+    "alg": "EdDSA",
+    "enc": "none",
+    "kid": "mock-sender-001",
+    "recipient": "gateway-dev",
+    "ts": "2020-01-01T00:00:00Z",
+    "nonce": "5rFPf-wWIczhaaAitAOOew",
+    "payload_hash": "IfBq5V-pFYBzzfW2K3S-zNKdsplvqUQW5rzB9Y-K5R4",
+    "payload": {
+      "messages": [
+        {
+          "content": "hello",
+          "role": "user"
+        }
+      ],
+      "model": "gpt-4.1@openai"
+    },
+    "sig": "F2jsV0MDaWtY_Eps34jEHZQS59lFl4qHvl7hQjB970im45St_GyJwbHZonKvTwI9d9_aXyG4NARp6Sb8H9LzAQ"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "vector_id": "005-encrypted-roundtrip",
+  "description": "xchacha20poly1305 encrypted payload",
+  "dev_only": true,
+  "signing_key_seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+  "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "expect_verify": "pass",
+  "envelope": {
+    "ope_version": "1.0",
+    "alg": "EdDSA",
+    "enc": "xchacha20poly1305",
+    "kid": "mock-sender-001",
+    "recipient": "gateway-dev",
+    "ts": "2026-05-19T15:01:47Z",
+    "nonce": "5rFPf-wWIczhaaAitAOOew",
+    "payload_hash": "IfBq5V-pFYBzzfW2K3S-zNKdsplvqUQW5rzB9Y-K5R4",
+    "ciphertext": "rlAn1EYO-3mN044nD7Dl36XSPUyQcByjRvRXITuhxOsJYq53bJSpDA-HO04FkIf3V7Sm5gb-HR-yHeuSS3vh0DSclBxJ8A_JyeK50C73DXl7bmJc73hBM68",
+    "iv": "ot6QuA1XfW8TfGKLdbOqXN8t7IjOeDzj",
+    "sig": "p5vwKXTPVpn5J_ML8iJ5l16185lDajLwxt6e1UazrbHCIuCbKWgsKfkZ1cRLevLZ2SP1KB0WzLQjPgCPowtaDw"
+  }
+}

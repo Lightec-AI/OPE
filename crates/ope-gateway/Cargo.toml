@@ -1,0 +1,15 @@
+[package]
+name = "ope-gateway"
+description = "OPE gateway: envelope verification, attestation policy, model routing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+ope-attest = { workspace = true }
+ope-crypto = { workspace = true }
+ope-envelope = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }

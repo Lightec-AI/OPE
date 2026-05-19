@@ -7,12 +7,12 @@ flowchart TB
   subgraph L4["L4 Application SDK — planned"]
     App[Conversations, files, providers]
   end
-  subgraph L3["L3 Attestation — stub"]
-    Att[ope-attest / ope.md §14]
+  subgraph L3["L3 Attestation — mock server"]
+    Att[ope-attest / ope-server §14]
   end
   subgraph L2["L2 Transport — partial"]
-    T[ope-transport: X25519MLKEM768 KEX]
-    TLS[TLS 1.3 + AES-GCM records — planned]
+    T[ope-transport: X25519MLKEM768 + HKDF harness]
+    TLS[TLS 1.3 wire — external stack]
   end
   subgraph L1["L1 Envelope — done"]
     E[ope-envelope: sign, verify, JCS]
@@ -32,11 +32,13 @@ flowchart TB
 | Layer | Crate | Spec | Implementation |
 |-------|-------|------|----------------|
 | L0 | `ope-crypto` | `ope.md` §5 | **Done** — Ed25519, SHA-256, base64url, `mock_keypair_from_seed` |
-| L1 | `ope-envelope` | `ope.md` §4–8 | **Done** — JCS, sign/verify, replay/timestamp options, `parse_routed_model` |
-| L2 | `ope-transport` | `spec/ope-transport.md` | **Partial** — hybrid KEX combiner; no TLS/HTTP yet |
-| L3 | `ope-attest` | `ope.md` §14 | **Stub** — types only |
-| L4 | `sdks/` | App conventions | **Not started** |
-| FFI | `ope-ffi` | Stable C ABI (target) | **Minimal** — dev-key verify only |
+| L1 | `ope-envelope` | `ope.md` §4–8 | **Done** — JCS, sign/verify, encrypt/decrypt, replay/timestamp |
+| L2 | `ope-transport` | `spec/ope-transport.md` | **Partial** — hybrid KEX + HKDF harness; wire TLS external |
+| L2b | `ope-http` | `spec/ope-transport.md` §4 | **Done** — content types |
+| L3 | `ope-attest` | `ope.md` §14 | **Done (mock)** — issue/verify + HTTP server |
+| L3b | `ope-gateway` | Gateway routing | **Done (mock)** — verify + strip `model@provider` |
+| L4 | `sdks/conversation` | App conventions | **Stub** — manifest types |
+| FFI | `ope-ffi` | Stable C ABI | **Done** — envelope sign/verify |
 | CLI | `ope-cli` | `spec/vectors/` | **Done** — `sign`, `verify`, `transport-test`, `keygen` |
 
 ## Repository layout

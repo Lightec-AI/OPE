@@ -1,21 +1,17 @@
-//! OPE L3: attestation and verification APIs (stub for P3).
+//! OPE L3: attestation issuance and verification (`ope.md` §14).
 
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
+mod canonical;
+mod error;
+mod mock;
+mod sign;
+mod types;
+mod verify;
 
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("attestation not implemented")]
-    NotImplemented,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VerificationVerdict {
-    pub verified: bool,
-    pub decision: String,
-}
-
-/// Placeholder for `POST /v1/ope/verifications:verifyEnvelope`.
-pub fn verify_envelope_stub() -> Result<VerificationVerdict, Error> {
-    Err(Error::NotImplemented)
-}
+pub use error::Error;
+pub use mock::{allow_verdict, checks_from_results, deny_verdict, MockAttester};
+pub use sign::{issue_attestation, sign_attestation};
+pub use types::{
+    Attestation, CreateAttestationRequest, CreateAttestationResponse, VerificationCheck,
+    VerificationError, VerificationVerdict, VerifyEnvelopeRequest,
+};
+pub use verify::verify_attestation;

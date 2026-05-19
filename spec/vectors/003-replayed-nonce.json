@@ -1,0 +1,28 @@
+{
+  "vector_id": "003-replayed-nonce",
+  "description": "Valid envelope used with replay cache (see tests)",
+  "dev_only": true,
+  "signing_key_seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+  "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "expect_verify": "pass",
+  "envelope": {
+    "ope_version": "1.0",
+    "alg": "EdDSA",
+    "enc": "none",
+    "kid": "mock-sender-001",
+    "recipient": "gateway-dev",
+    "ts": "2026-05-19T15:01:47Z",
+    "nonce": "F7U1nDyjNUV6MxSZ3QXTpw",
+    "payload_hash": "IfBq5V-pFYBzzfW2K3S-zNKdsplvqUQW5rzB9Y-K5R4",
+    "payload": {
+      "messages": [
+        {
+          "content": "hello",
+          "role": "user"
+        }
+      ],
+      "model": "gpt-4.1@openai"
+    },
+    "sig": "00Od5AqrLFHpO-AoHgiUXNh5RVVgBRgEa6l4yqD7UOlKSyvEYugUzwk1Hj5iwt-DNFzlvx6SNbYJgzfIPWZoCQ"
+  }
+}

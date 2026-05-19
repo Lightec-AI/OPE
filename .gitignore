@@ -1,7 +1,10 @@
 /target/
+bindings/python/.venv/
+bindings/ts/node_modules/
 spec/vectors/transport/source/*.txt
 **/*.rs.bk
 .DS_Store
 *.swp
 .idea/
 .vscode/
+bindings/ts/dist/

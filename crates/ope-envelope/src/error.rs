@@ -26,4 +26,10 @@ pub enum Error {
     PayloadHashMismatch,
     #[error("invalid model id: {0}")]
     InvalidModelId(String),
+    #[error("encryption failed: {0}")]
+    Encryption(String),
+    #[error("decryption failed: {0}")]
+    Decryption(String),
+    #[error("invalid recipient: expected {expected}, got {actual}")]
+    InvalidRecipient { expected: String, actual: String },
 }

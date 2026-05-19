@@ -1,0 +1,17 @@
+[package]
+name = "ope-server"
+description = "HTTP server for OPE attestation and verification APIs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+axum = { workspace = true }
+ope-attest = { workspace = true }
+ope-gateway = { workspace = true }
+ope-http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tower = { workspace = true }

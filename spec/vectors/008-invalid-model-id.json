@@ -1,0 +1,29 @@
+{
+  "vector_id": "008-invalid-model-id",
+  "description": "Missing @provider in payload.model",
+  "dev_only": true,
+  "signing_key_seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+  "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "expect_verify": "fail",
+  "expect_error_substr": "model",
+  "envelope": {
+    "ope_version": "1.0",
+    "alg": "EdDSA",
+    "enc": "none",
+    "kid": "mock-sender-001",
+    "recipient": "gateway-dev",
+    "ts": "2026-05-19T15:01:47Z",
+    "nonce": "5rFPf-wWIczhaaAitAOOew",
+    "payload_hash": "GyynbbNeMEs_T3CRWd4LRpcA7YNZmPhdfab3WGpTwFo",
+    "payload": {
+      "messages": [
+        {
+          "content": "hello",
+          "role": "user"
+        }
+      ],
+      "model": "gpt-4.1"
+    },
+    "sig": "aoPDRsycP4-qGfg7QpmugHP-CUKQgxaMQcLKLU-giYfl__-U3QKQEpmWuixE6MQPnqQbS3I5tIwvW-aG5b0-Cw"
+  }
+}

@@ -16,7 +16,9 @@ clap = { version = "4", features = ["derive"] }
 hex = "0.4"
 ope-crypto = { workspace = true }
 ope-envelope = { workspace = true }
+ope-server = { workspace = true }
 ope-transport = { workspace = true }
+tokio = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
