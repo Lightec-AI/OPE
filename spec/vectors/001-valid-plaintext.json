@@ -1,0 +1,27 @@
+{
+  "vector_id": "001-valid-plaintext",
+  "description": "Valid signed plaintext envelope (enc=none), mock dev keys",
+  "dev_only": true,
+  "signing_key_seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+  "verifying_key_hex": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "envelope": {
+    "ope_version": "1.0",
+    "alg": "EdDSA",
+    "enc": "none",
+    "kid": "mock-sender-001",
+    "recipient": "gateway-dev",
+    "ts": "2026-05-19T14:07:55Z",
+    "nonce": "9dVYKDyujRLU4mkajmsV2Q",
+    "payload_hash": "IfBq5V-pFYBzzfW2K3S-zNKdsplvqUQW5rzB9Y-K5R4",
+    "payload": {
+      "messages": [
+        {
+          "content": "hello",
+          "role": "user"
+        }
+      ],
+      "model": "gpt-4.1@openai"
+    },
+    "sig": "EzgSqZC49dXCkgmwAckv0DESqla8cDTMkI9Q7DmSB7BLxTbSFchTNh0EjLXxYM0N8NdesDJkxP9Cvdo64UMWCA"
+  }
+}

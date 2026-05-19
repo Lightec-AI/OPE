@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Sign test vector
+        run: cargo run -p ope-cli -- sign --vector spec/vectors/001-valid-plaintext.json
+      - name: Test
+        run: cargo test --all
+      - name: Transport official vectors
+        run: cargo test -p ope-transport --test official_vectors

@@ -1,0 +1,23 @@
+[package]
+name = "ope-transport"
+description = "OPE transport profile: X25519MLKEM768 hybrid KEX (TLS-aligned)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+hex = { workspace = true }
+kem = "0.3.0-pre.0"
+ml-kem = { workspace = true }
+ope-crypto = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+x25519-dalek = { workspace = true }
+
+[dev-dependencies]
+hex = "0.4"
+serde = { workspace = true }
+serde_json = { workspace = true }

@@ -1,0 +1,35 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/ope-crypto",
+    "crates/ope-envelope",
+    "crates/ope-transport",
+    "crates/ope-attest",
+    "crates/ope-ffi",
+    "crates/ope-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/ClawBay/OPE"
+rust-version = "1.75"
+
+[workspace.dependencies]
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+ml-kem = "0.2"
+rand = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
+sha2 = "0.10"
+thiserror = "2"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+
+ope-attest = { path = "crates/ope-attest" }
+ope-crypto = { path = "crates/ope-crypto" }
+ope-envelope = { path = "crates/ope-envelope" }
+ope-transport = { path = "crates/ope-transport" }

@@ -1,0 +1,22 @@
+[package]
+name = "ope-cli"
+description = "OPE command-line tools (vectors, dev keys)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "ope"
+path = "src/main.rs"
+
+[dependencies]
+chrono = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+hex = "0.4"
+ope-crypto = { workspace = true }
+ope-envelope = { workspace = true }
+ope-transport = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

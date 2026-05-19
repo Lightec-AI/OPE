@@ -1,0 +1,16 @@
+[package]
+name = "ope-crypto"
+description = "OPE cryptographic primitives (Ed25519, hashing, base64url)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+base64.workspace = true
+ed25519-dalek.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+hex = "0.4"
