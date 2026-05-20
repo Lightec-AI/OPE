@@ -12,8 +12,8 @@
     "enc": "none",
     "kid": "mock-sender-001",
     "recipient": "gateway-dev",
-    "ts": "2026-05-19T15:01:47Z",
-    "nonce": "5rFPf-wWIczhaaAitAOOew",
+    "ts": "2026-05-19T23:26:20Z",
+    "nonce": "HbivGQdPuOHP_t6Xmhy8hQ",
     "payload_hash": "GyynbbNeMEs_T3CRWd4LRpcA7YNZmPhdfab3WGpTwFo",
     "payload": {
       "messages": [
@@ -24,6 +24,6 @@
       ],
       "model": "gpt-4.1"
     },
-    "sig": "aoPDRsycP4-qGfg7QpmugHP-CUKQgxaMQcLKLU-giYfl__-U3QKQEpmWuixE6MQPnqQbS3I5tIwvW-aG5b0-Cw"
+    "sig": "xwVrzFMM1L4YZY1kmvMqdawpF4SbIqhQ7IXsDUGr5ha4maI5cd9uJ3VP0UCoywBn9pb0k8mWDsEoVbM-QAPEBQ"
   }
 }
