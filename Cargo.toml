@@ -4,6 +4,7 @@ members = [
     "crates/ope-crypto",
     "crates/ope-envelope",
     "crates/ope-transport",
+    "crates/ope-e2e",
     "crates/ope-http",
     "crates/ope-attest",
     "crates/ope-gateway",
@@ -47,3 +48,4 @@ ope-gateway = { path = "crates/ope-gateway" }
 ope-http = { path = "crates/ope-http" }
 ope-server = { path = "crates/ope-server" }
 ope-transport = { path = "crates/ope-transport" }
+ope-e2e = { path = "crates/ope-e2e" }

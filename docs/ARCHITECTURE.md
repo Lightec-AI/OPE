@@ -1,107 +1,105 @@
 # OPE architecture
 
+OPE is the **privacy layer for Confidential AI**: signed envelopes on standard TLS, with **application-layer E2E** encryption to inference TEEs the gateway cannot read.
+
+See [`docs/confidential-ai.md`](confidential-ai.md) and [`spec/ope-confidential-ai.md`](../spec/ope-confidential-ai.md).
+
+## Trust model
+
+```text
+Client ──TLS 1.3 (unchanged)──► Gateway (TDX/SEV) ──► Inference engine (TDX/SEV + GPU TEE)
+         OPE signed envelope          meta only              decrypt / infer / encrypt stream
+         enc=e2e-hybrid-pq            opaque forward
+```
+
+| Component | Sees prompt/context? | Crypto role |
+|-----------|----------------------|-------------|
+| Client | Yes (before encrypt) | User Ed25519 `kid`; ephemeral hybrid per request |
+| Gateway | **No** (opaque `ciphertext`) | Verify `sig`, attestation, `meta`; meter/route |
+| Inference engine | Yes | Static ML-KEM + X25519; decrypt request; stream-encrypt response |
+
 ## Layer stack
 
 ```mermaid
 flowchart TB
-  subgraph L4["L4 Application SDK — planned"]
-    App[Conversations, files, providers]
+  subgraph L5["L5 Light SDK / bindings"]
+    SDK[encrypt_request + sign + decrypt_stream]
   end
-  subgraph L3["L3 Attestation — mock server"]
-    Att[ope-attest / ope-server §14]
+  subgraph L4["L4 Gateway + attestation"]
+    GW[ope-gateway opaque verify]
+    ATT[ope-attest TEE evidence]
   end
-  subgraph L2["L2 Transport — partial"]
-    T[ope-transport: X25519MLKEM768 + HKDF harness]
-    TLS[TLS 1.3 wire — external stack]
+  subgraph L3["L3 OPE-E2E — Confidential AI"]
+    E2E[ope-e2e: hybrid PQ content keys + stream]
   end
-  subgraph L1["L1 Envelope — done"]
-    E[ope-envelope: sign, verify, JCS]
+  subgraph L2["L2 OPE envelope"]
+    ENV[ope-envelope: JCS + Ed25519 + meta]
   end
-  subgraph L0["L0 Crypto — done"]
-    C[ope-crypto: Ed25519, SHA-256, base64url]
+  subgraph L1["L1 TLS — external"]
+    TLS[Standard TLS 1.3 any stack]
   end
-  App --> Att
-  App --> E
-  Att --> E
-  E --> T
-  T --> TLS
-  T --> C
-  E --> C
+  subgraph L0["L0 Primitives"]
+    C[ope-crypto]
+    T[ope-transport KEX bytes]
+  end
+  SDK --> E2E
+  SDK --> ENV
+  GW --> ENV
+  GW --> ATT
+  E2E --> ENV
+  E2E --> T
+  E2E --> C
+  ENV --> C
+  ENV --> TLS
 ```
 
-| Layer | Crate | Spec | Implementation |
-|-------|-------|------|----------------|
-| L0 | `ope-crypto` | `ope.md` §5 | **Done** — Ed25519, SHA-256, base64url, `mock_keypair_from_seed` |
-| L1 | `ope-envelope` | `ope.md` §4–8 | **Done** — JCS, sign/verify, encrypt/decrypt, replay/timestamp |
-| L2 | `ope-transport` | `spec/ope-transport.md` | **Partial** — hybrid KEX + HKDF harness; wire TLS external |
-| L2b | `ope-http` | `spec/ope-transport.md` §4 | **Done** — content types |
-| L3 | `ope-attest` | `ope.md` §14 | **Done (mock)** — issue/verify + HTTP server |
-| L3b | `ope-gateway` | Gateway routing | **Done (mock)** — verify + strip `model@provider` |
-| L4 | `sdks/conversation` | App conventions | **Stub** — manifest types |
-| FFI | `ope-ffi` | Stable C ABI | **Done** — envelope sign/verify |
-| CLI | `ope-cli` | `spec/vectors/` | **Done** — `sign`, `verify`, `transport-test`, `keygen` |
+| Layer | Crate | Spec | Status |
+|-------|-------|------|--------|
+| L0 | `ope-crypto`, `ope-transport` | §5, transport | Done |
+| L2 | `ope-envelope` | `ope.md` §4–8 | Done + `e2e-hybrid-pq` fields |
+| L3 | **`ope-e2e`** | `spec/ope-confidential-ai.md` | **Reference** (mock engine) |
+| L1 | TLS | — | **External** (no OPE fork) |
+| L4 | `ope-gateway`, `ope-attest`, `ope-server` | §14, confidential-ai | Gateway opaque mode done |
+| L5 | `ope-ffi`, `bindings/*` | — | Envelope only; E2E FFI planned |
 
-## Repository layout
-
-```text
-OPE/
-├── ope.md                      # Normative protocol
-├── spec/
-│   ├── ope-transport.md        # Transport profile
-│   └── vectors/*.json          # Interop vectors
-├── crates/
-│   ├── ope-crypto/
-│   ├── ope-envelope/
-│   ├── ope-transport/
-│   ├── ope-attest/
-│   ├── ope-ffi/
-│   └── ope-cli/
-├── bindings/                   # planned
-├── docs/
-│   ├── ARCHITECTURE.md         # this file
-│   └── ROADMAP.md
-├── .github/workflows/ci.yml
-└── rust-toolchain.toml         # stable
-```
+`ope-transport` provides **X25519MLKEM768** math shared with TLS PQ drafts; production TLS uses s2n/BoringSSL directly. **Application E2E** uses `ope-e2e` HKDF labels, not TLS record keys.
 
 ## Cryptographic separation
 
-| Purpose | Algorithms | Where stored |
-|---------|------------|--------------|
-| Envelope integrity / sender auth | Ed25519 (`kid`) | Client key store; `sig` on wire |
-| Payload digest | SHA-256 → base64url `payload_hash` | Envelope |
-| Optional payload confidentiality | XChaCha20-Poly1305 or AES-GCM (`enc` field) | Envelope (`ciphertext`, `iv`) |
-| Channel confidentiality | TLS 1.3 + `X25519MLKEM768` → HKDF → AES-GCM records | Session (not the `kid` key) |
+| Purpose | Algorithms | Holder |
+|---------|------------|--------|
+| Envelope integrity / user auth | Ed25519 (`kid`) | Client |
+| Gateway policy | Attestation + `meta` | Gateway TEE |
+| Request confidentiality | ML-KEM-768 + X25519 → ChaCha20-Poly1305 (`enc=e2e-hybrid-pq`) | **Inference engine only** |
+| Response confidentiality | Ephemeral hybrid + `chacha20poly1305-stream` | Client ephemeral session |
+| Wire channel | TLS 1.3 (optional PQ) | Any TLS terminator |
 
-**Rule:** Never use the envelope Ed25519 key as a TLS certificate or hybrid KEX identity.
+**Rules:**
 
-## Envelope verify pipeline (`ope-envelope`)
+1. Never use envelope `kid` Ed25519 keys for hybrid KEX.
+2. Gateway MUST NOT hold engine ML-KEM decapsulation keys in production.
+3. Do not derive OPE content keys from TLS session secrets.
 
-1. Structural validation (`ope_version`, `alg`, `enc`, required fields).
-2. Timestamp within skew (`VerifyOptions::max_skew`, default ±300s).
-3. Optional replay cache on `(kid, nonce)`.
-4. Recompute `payload_hash` over canonical JCS payload bytes.
-5. Verify Ed25519 signature over canonical JCS signed-field object (§5).
+## Envelope verify (gateway)
 
-Signed fields: `ope_version`, `alg`, `enc`, `kid`, `recipient`, `ts`, `nonce`, `payload_hash`, plus `ciphertext`, `iv`, `aad` when present.
+1. Structural validation (`enc=e2e-hybrid-pq` requires `engine_id`, `e2e`).
+2. Timestamp + nonce replay.
+3. Ed25519 signature (includes `engine_id`, `e2e` when present).
+4. **`opaque_e2e: true`** — skip decrypt; validate routing via `meta.model` if required.
+5. Attestation + policy.
 
-## Transport pipeline (`ope-transport`)
+## Envelope verify (inference engine)
 
-Implements [draft-ietf-tls-ecdhe-mlkem](https://datatracker.ietf.org/doc/draft-ietf-tls-ecdhe-mlkem/) **shared secret** construction for `X25519MLKEM768`:
-
-- Client share (1216 B): `ML-KEM-768 encapsulation key || X25519 public`
-- Server share (1120 B): `ML-KEM ciphertext || X25519 public`
-- Shared secret (64 B): `ML-KEM_ss || X25519_ss`
-
-Production stacks should feed this secret into the TLS 1.3 key schedule ([RFC 8446](https://www.rfc-editor.org/rfc/rfc8446)). The in-repo harness runs KEX without TLS for CI (`ope transport-test`).
+Same as gateway for signature/freshness, then `ope_e2e::decrypt_request`, verify `payload_hash`, run model.
 
 ## Interoperability
 
-- **Vectors:** `spec/vectors/*.json` — language bindings must pass the same files as `cargo test` / `ope verify`.
-- **CI:** GitHub Actions signs `001` then runs `cargo test --all`.
+- Legacy vectors `001`–`008`: gateway-local `enc=xchacha20poly1305` / `none`.
+- Confidential AI vectors: `spec/vectors/confidential-ai/` (planned).
+- CI: `cargo test --all`, `ope e2e-test`.
 
 ## Design rules
 
-1. **Rust is the reference implementation** for cryptography and canonicalization.
-2. **One crypto core** — other languages bind `ope-ffi` or re-run vectors; no duplicated primitive logic.
-3. **Interop via vectors** — spec changes require new vector files before release.
+1. **Rust reference** for canonicalization and E2E math.
+2. **Standard TLS** for third-party HTTP integration.
+3. **Thin SDK** — wrap/unwrapping without forking TLS.

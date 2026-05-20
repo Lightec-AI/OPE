@@ -11,11 +11,11 @@
     "enc": "xchacha20poly1305",
     "kid": "mock-sender-001",
     "recipient": "gateway-dev",
-    "ts": "2026-05-19T23:26:20Z",
-    "nonce": "HbivGQdPuOHP_t6Xmhy8hQ",
+    "ts": "2026-05-20T09:52:05Z",
+    "nonce": "WE1L7wO2A758mMeRdo_KrA",
     "payload_hash": "IfBq5V-pFYBzzfW2K3S-zNKdsplvqUQW5rzB9Y-K5R4",
-    "ciphertext": "Xw_IqFT3JNQk78QeHvm9XeneJhuutWJyX06nygB3sQgtaC-s6dZpSVsm9yv2f8af97n5suLlJ5vyRYYHiachUdEACPbWfA2scVEyNBzKFIvS-pukz7ThGMw",
-    "iv": "JtyaPW8R_zKb6XEeZJl38B5aJdlZZJbq",
-    "sig": "ifdToLrfqJRNiksNnT_Yz8sZtyxIZP59CVm53lO_OEPY0v8vN0sLx7uMWs4i2hTIBlD7OEqxk4Eww6ibkH0qCw"
+    "ciphertext": "7Ffnhqgvxwuwg0P-6ddwR6ZUIRHnmsTkXw-kQALRxmxFutKCkOzb2ImoD4couV5Afu4tj--SOX9z7cDS5_ZpowjnA1Po3wH7Xe3ldpTNGvlUbhPyv0qoD9Y",
+    "iv": "nymDVTH5FEvhdUBpzCwCvuMzSkFhDO7i",
+    "sig": "NNH64V9ZEArNf0ZDorf5JBlDXoIU-8Qb3hzLO80UZbSAmh5XxHHmsZ_4fOswVc0yshMne4vAT_-3pYcLPGMTDA"
   }
 }

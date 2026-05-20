@@ -73,8 +73,13 @@ pub fn verify_envelope_request(
             max_skew: std::time::Duration::from_secs(300),
             seen_nonces: Some(seen_nonces.clone()),
             expected_recipient: Some(config.gateway_id.clone()),
-            content_key: config.content_key,
+            content_key: if envelope.enc == ope_envelope::Envelope::ENC_E2E_HYBRID_PQ {
+                None
+            } else {
+                config.content_key
+            },
             require_routed_model: config.require_routed_model,
+            opaque_e2e: true,
         },
     );
 

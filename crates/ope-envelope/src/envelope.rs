@@ -9,6 +9,9 @@ pub struct Envelope {
     pub enc: String,
     pub kid: String,
     pub recipient: String,
+    /// Target inference engine (`enc=e2e-hybrid-pq`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub engine_id: Option<String>,
     pub ts: String,
     pub nonce: String,
     pub payload_hash: String,
@@ -22,6 +25,9 @@ pub struct Envelope {
     pub aad: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<Value>,
+    /// Hybrid E2E session descriptor ([`spec/ope-confidential-ai.md`](../../spec/ope-confidential-ai.md)).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub e2e: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sig: Option<String>,
 }
@@ -30,6 +36,8 @@ impl Envelope {
     pub const VERSION: &'static str = "1.0";
     pub const ALG_EDDSA: &'static str = "EdDSA";
     pub const ENC_NONE: &'static str = "none";
+    /// Confidential AI: PQ hybrid encrypt to inference engine TEE.
+    pub const ENC_E2E_HYBRID_PQ: &'static str = "e2e-hybrid-pq";
 
     pub fn validate_structure(&self) -> Result<(), crate::Error> {
         if self.ope_version != Self::VERSION {
@@ -51,7 +59,7 @@ impl Envelope {
                     ));
                 }
             }
-            "xchacha20poly1305" | "A256GCM" => {
+            "xchacha20poly1305" | "A256GCM" | Self::ENC_E2E_HYBRID_PQ => {
                 if self.payload.is_some() {
                     return Err(crate::Error::InvalidEnvelope(
                         "encrypted enc must omit payload".into(),
@@ -61,6 +69,18 @@ impl Envelope {
                     return Err(crate::Error::InvalidEnvelope(
                         "encrypted enc requires ciphertext and iv".into(),
                     ));
+                }
+                if self.enc == Self::ENC_E2E_HYBRID_PQ {
+                    if self.engine_id.is_none() {
+                        return Err(crate::Error::InvalidEnvelope(
+                            "e2e-hybrid-pq requires engine_id".into(),
+                        ));
+                    }
+                    if self.e2e.is_none() {
+                        return Err(crate::Error::InvalidEnvelope(
+                            "e2e-hybrid-pq requires e2e".into(),
+                        ));
+                    }
                 }
             }
             other => return Err(crate::Error::UnsupportedEnc(other.to_string())),

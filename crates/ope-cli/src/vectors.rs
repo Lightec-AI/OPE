@@ -169,6 +169,7 @@ fn sample_envelope() -> Envelope {
         enc: Envelope::ENC_NONE.into(),
         kid: "mock-sender-001".into(),
         recipient: "gateway-dev".into(),
+        engine_id: None,
         ts: Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         nonce: encode(&nonce),
         payload_hash: String::new(),
@@ -180,6 +181,7 @@ fn sample_envelope() -> Envelope {
         iv: None,
         aad: None,
         meta: None,
+        e2e: None,
         sig: None,
     }
 }

@@ -1,51 +1,40 @@
-# OPE TLS 1.3 integration guide (P1)
+# TLS integration (unchanged third-party TLS)
 
-OPE-Transport uses **TLS 1.3** with hybrid **`X25519MLKEM768`** (`0x11EC`) per [draft-ietf-tls-ecdhe-mlkem](https://datatracker.ietf.org/doc/draft-ietf-tls-ecdhe-mlkem/). Envelope signing (Ed25519) remains separate from TLS credentials.
+OPE **does not** define a custom TLS record layer. Integrators use **normal TLS 1.3** (OpenSSL, BoringSSL, s2n-tls, platform stacks) and carry OPE bodies as `application/ope+json`.
 
-## Recommended production stacks
+## Confidential AI placement
 
-| Stack | Policy / notes |
-|-------|----------------|
-| [AWS s2n-tls](https://github.com/aws/s2n-tls) | Security policies `AWS-CRT-SDK-TLSv1.3-2025-PQ`, `AWS-LC-TLSv1.3-2025-PQ` |
-| [Google BoringSSL / Chromium](https://chromium.googlesource.com/chromium/src/+/main/net/socket/) | Group `X25519MLKEM768` (`4588` / `0x11EC`) |
-| [AWS KMS PQ TLS](https://docs.aws.amazon.com/kms/latest/developerguide/pqtls.html) | Same hybrid group for KMS endpoints |
+| Layer | What it protects | Required? |
+|-------|------------------|-----------|
+| **TLS 1.3** | Bytes on the wire to gateway | Yes (standard HTTPS) |
+| **OPE envelope `sig`** | Sender auth + envelope integrity | Yes |
+| **`enc=e2e-hybrid-pq`** | Prompt/context to **inference engine only** | Yes (Confidential AI profile) |
 
-Configure the client and server to negotiate **`X25519MLKEM768`** (and optionally classical fallbacks per your threat model). Record protection stays **AES-256-GCM** (TLS 1.3 default).
+The gateway may terminate TLS inside a TEE but still MUST treat `ciphertext` as opaque (see [`confidential-ai.md`](confidential-ai.md)).
 
-## Mapping `ope-transport` → TLS
+## Optional PQ TLS
 
-1. **KEX (in-repo):** `ope_transport::ClientKeyExchange` / `ServerKeyExchange` produce the 64-byte combined secret `ML-KEM_ss || X25519_ss` (see `spec/ope-transport.md` §3).
-2. **HKDF (in-repo harness):** `ope_transport::derive_record_keys` expands that secret into client/server write keys and IVs for tests. Production MUST use the TLS 1.3 key schedule in your TLS library instead of calling this directly on the wire.
-3. **Application data:** After TLS is up, send OPE envelopes with `Content-Type: application/ope+json` (`ope-http` constants).
+For channel-level post-quantum hybrid KEX, configure your TLS stack with **`X25519MLKEM768`** per [draft-ietf-tls-ecdhe-mlkem](https://datatracker.ietf.org/doc/draft-ietf-tls-ecdhe-mlkem/). This is **independent** of OPE-E2E content keys (`ope-e2e` HKDF label `OPE-E2E-v1`).
 
-```rust
-use ope_transport::{ClientKeyExchange, ServerKeyExchange, client_shared_secret, derive_record_keys};
+| Stack | Notes |
+|-------|--------|
+| AWS s2n-tls | Policies `AWS-CRT-SDK-TLSv1.3-2025-PQ` |
+| Google BoringSSL / Chromium | Group `0x11EC` |
+| AWS KMS PQ TLS | Same hybrid group |
 
-let client = ClientKeyExchange::generate()?;
-let (server_share, _) = ServerKeyExchange::respond_to(&client)?;
-let secret = client_shared_secret(&client, &server_share)?;
-let keys = derive_record_keys(&secret, &client_random, &server_random)?;
-```
+Reference KEX tests: `cargo run -p ope-cli -- transport-test` (`ope-transport` only).
 
 ## HTTP framing
 
 | Header | Value |
 |--------|--------|
-| `Content-Type` | `application/ope+json` (envelope body) |
-| Attestation / verification APIs | `application/json` per `ope.md` §14 |
-
-See `ope-http` and `ope-server` (`cargo run -p ope-cli -- serve`).
-
-## Defense in depth
-
-| Layer | Protects |
-|-------|----------|
-| TLS 1.3 + hybrid KEX | Wire confidentiality / PQ-forward secrecy on channel |
-| OPE envelope signature | Sender authenticity + integrity of signed fields |
-| `enc=xchacha20poly1305` / `enc=A256GCM` | Payload confidentiality to gateway even if TLS terminates early |
+| `Content-Type` | `application/ope+json` |
+| Streaming response chunks | `application/ope+json` lines or SSE `data:` with `ope_stream` objects |
 
 ## Development / CI
 
-- Run primitive KEX tests: `cargo run -p ope-cli -- transport-test`
-- Official vectors: `cargo test -p ope-transport --test official_vectors`
-- Self-signed TLS certs are acceptable locally; **never** use `dev_only` envelope or attester keys in production.
+- Envelope vectors: `cargo test -p ope-envelope`
+- E2E round-trip: `cargo run -p ope-cli -- e2e-test`
+- Transport vectors: `cargo test -p ope-transport --test official_vectors`
+
+Do not use `dev_only` envelope or mock engine seeds (`DEV_ENGINE_SEED`) in production.

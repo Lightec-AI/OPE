@@ -60,6 +60,7 @@ fn all_spec_vectors() {
                 expected_recipient,
                 content_key,
                 require_routed_model: require_model,
+                opaque_e2e: false,
             },
         );
 

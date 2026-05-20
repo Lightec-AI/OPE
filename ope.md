@@ -2,7 +2,7 @@
 
 Status: Draft  
 Audience: Protocol implementers, SDK authors, API gateway maintainers  
-Goal: Define a vendor-neutral envelope for privacy-preserving API calls (including OpenAI-compatible payloads).
+Goal: Define a vendor-neutral envelope for **Confidential AI** — privacy-preserving API calls where gateways (TDX/SEV) authenticate and meter traffic without seeing prompts, and inference engines (TDX/SEV + GPU TEE) alone decrypt payloads (including OpenAI-compatible bodies).
 
 ## 1. Scope
 
@@ -22,6 +22,8 @@ OPE does **not** mandate a specific identity provider, key escrow model, or tran
 |----------|--------|
 | [`spec/ope-transport.md`](spec/ope-transport.md) | Hybrid post-quantum transport (TLS 1.3 + `X25519MLKEM768`) |
 | [`spec/vectors/`](spec/vectors/) | Interoperability test vectors |
+| [`spec/ope-confidential-ai.md`](spec/ope-confidential-ai.md) | **Confidential AI E2E profile** (`enc=e2e-hybrid-pq`) |
+| [`docs/confidential-ai.md`](docs/confidential-ai.md) | Architecture: client / gateway / inference engine |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Repository layout and layer model |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Implementation phases |
 
@@ -111,6 +113,21 @@ Recommended baseline:
 - Gateway decrypts, re-hashes payload, verifies `payload_hash`, then routes.
 
 Alternative AEAD (`A256GCM`) MAY be supported via profile declaration.
+
+### 6.3 `enc=e2e-hybrid-pq` (Confidential AI — normative profile)
+
+Production Confidential AI deployments MUST use this mode for user prompts and context.
+
+- `payload` omitted; `ciphertext` + `iv` required.
+- `engine_id` (string) names the target inference engine.
+- `e2e` (object) carries hybrid `X25519MLKEM768` material per [`spec/ope-confidential-ai.md`](spec/ope-confidential-ai.md).
+- `meta` (object) SHOULD expose gateway-visible fields (`tenant`, `model`, `metering`) without plaintext payload.
+- **Gateway** MUST verify signature and policy but MUST NOT decrypt `ciphertext` (opaque forward).
+- **Inference engine** MUST verify `payload_hash` after decrypt.
+
+Request content key: HKDF over `ML-KEM_ss || X25519_ss` with `info = "OPE-E2E-v1" || "request" || engine_id || kid || nonce`.
+
+Response streaming SHOULD use `chacha20poly1305-stream` in the `e2e` object with per-chunk nonces (see confidential-ai spec §7).
 
 ## 7. Replay and Freshness Rules
 
@@ -412,7 +429,8 @@ This repository ships a reference workspace (see [`README.md`](README.md)):
 |-------|----------------|--------|
 | `ope-crypto` | §5 primitives | Ed25519, SHA-256, base64url; dev mock keys |
 | `ope-envelope` | §4–8, §11 | Sign/verify, encrypt/decrypt, JCS, vectors `001`–`008` |
-| `ope-transport` | [`spec/ope-transport.md`](spec/ope-transport.md) | `X25519MLKEM768` KEX + `derive_record_keys` (HKDF harness) |
+| `ope-e2e` | [`spec/ope-confidential-ai.md`](spec/ope-confidential-ai.md) | Hybrid PQ E2E encrypt/decrypt + stream chunks |
+| `ope-transport` | [`spec/ope-transport.md`](spec/ope-transport.md) | `X25519MLKEM768` KEX (TLS-aligned tests; not app E2E) |
 | `ope-http` | Transport §4 | `application/ope+json` framing |
 | `ope-attest` | §14 | Mock attester + attestation sign/verify |
 | `ope-gateway` | §8, §14 | Gateway verify + `model@provider` strip |
@@ -420,6 +438,13 @@ This repository ships a reference workspace (see [`README.md`](README.md)):
 | `ope-ffi` | Bindings | C ABI envelope sign/verify |
 | `ope-cli` | §12 vectors | `gen-vectors`, `serve`, `hkdf-test`, `transport-test` |
 
-**Key separation:** envelope signing uses long-lived Ed25519 keys (`kid`). Transport sessions use ephemeral X25519 + ML-KEM-768 per [draft-ietf-tls-ecdhe-mlkem](https://datatracker.ietf.org/doc/draft-ietf-tls-ecdhe-mlkem/). These MUST NOT be mixed.
+**Key separation:**
 
-**Transport:** Production deployments SHOULD terminate TLS 1.3 with `X25519MLKEM768` (as in Google Chrome / AWS s2n-tls). See [`docs/tls-integration.md`](docs/tls-integration.md). The in-repo HKDF helper is for tests; wire TLS uses an external stack.
+| Keys | Use |
+|------|-----|
+| Ed25519 `kid` | Envelope signatures only |
+| Engine ML-KEM + X25519 (static) | Decrypt requests inside inference TEE |
+| Client ephemeral hybrid | Decrypt streaming responses |
+| TLS session keys | Standard HTTPS — optional PQ per [`docs/tls-integration.md`](docs/tls-integration.md) |
+
+**TLS:** Use ordinary TLS 1.3; OPE does not ship a custom TLS implementation. **E2E** uses `ope-e2e` HKDF labels, not TLS exporter secrets.

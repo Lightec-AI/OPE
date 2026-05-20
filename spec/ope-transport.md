@@ -47,14 +47,15 @@ Note: share order for `X25519MLKEM768` is historically ML-KEM first, then X25519
 
 ## 4. OPE usage profile
 
-1. Establish TLS 1.3 with `X25519MLKEM768` negotiated (or ALPN-equivalent bootstrap in custom stacks).
-2. Send OPE envelopes as application data (`Content-Type: application/ope+json` over HTTP, or equivalent framing).
-3. Envelope layer (`ope.md`) still requires Ed25519 signature over signed fields regardless of transport encryption.
+**Confidential AI (primary):** Use **standard TLS 1.3** for HTTPS and **`enc=e2e-hybrid-pq`** for application E2E per [`ope-confidential-ai.md`](ope-confidential-ai.md). OPE-Transport KEX math is shared with TLS PQ groups but **application keys come from `ope-e2e`**, not TLS exporters.
 
-Defense in depth:
+**Optional channel PQ:**
 
-- **Transport only:** gateway sees plaintext payload after TLS decrypt.
-- **Transport + `enc=xchacha20poly1305` or `enc=A256GCM`:** payload remains E2E to gateway even if TLS is terminated early.
+1. Establish TLS 1.3 with `X25519MLKEM768` negotiated when desired.
+2. Send OPE envelopes as `application/ope+json`.
+3. Envelope Ed25519 signature is always required.
+
+Legacy gateway-local encryption (`enc=xchacha20poly1305`, `enc=A256GCM`) encrypts to the gateway content key; Confidential AI deployments MUST NOT rely on this for user prompts.
 
 ## 5. Development mode (mock keys)
 

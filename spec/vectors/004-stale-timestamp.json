@@ -13,7 +13,7 @@
     "kid": "mock-sender-001",
     "recipient": "gateway-dev",
     "ts": "2020-01-01T00:00:00Z",
-    "nonce": "HbivGQdPuOHP_t6Xmhy8hQ",
+    "nonce": "WE1L7wO2A758mMeRdo_KrA",
     "payload_hash": "IfBq5V-pFYBzzfW2K3S-zNKdsplvqUQW5rzB9Y-K5R4",
     "payload": {
       "messages": [
@@ -24,6 +24,6 @@
       ],
       "model": "gpt-4.1@openai"
     },
-    "sig": "Y1v2dmhaayz0nUGGw1bT1ocEWa561Mmzcrb5dx1-aROh6NJd4yn2HCLZbQGLcDgSL5sirodwZcpaI9a6Y7TRBQ"
+    "sig": "poGy1mLkeft9ruTwYgtD_9b4I1WL9qxQjzU5UmDQaruBGV5k9n7_JBJ0bpG6SIe4d2BfBQhqGbBCfo11BouACg"
   }
 }

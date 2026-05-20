@@ -122,6 +122,7 @@ pub unsafe extern "C" fn ope_envelope_verify(
         expected_recipient: None,
         content_key: None,
         require_routed_model: false,
+        opaque_e2e: false,
     };
     match verify_envelope(&envelope, &public, &options) {
         Ok(()) => OPE_OK,

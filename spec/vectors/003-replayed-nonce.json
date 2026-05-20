@@ -11,8 +11,8 @@
     "enc": "none",
     "kid": "mock-sender-001",
     "recipient": "gateway-dev",
-    "ts": "2026-05-19T23:26:20Z",
-    "nonce": "0ESl7FB-eVdqStjWZ7Rvtw",
+    "ts": "2026-05-20T09:52:05Z",
+    "nonce": "xX3C317WVDTc4hmgz5hnvA",
     "payload_hash": "IfBq5V-pFYBzzfW2K3S-zNKdsplvqUQW5rzB9Y-K5R4",
     "payload": {
       "messages": [
@@ -23,6 +23,6 @@
       ],
       "model": "gpt-4.1@openai"
     },
-    "sig": "3CVJ1ZggfJ4KhoqiJR_doha0daa57iEgnvTq9GNfG0pwcJ7YGqbYv3AB6N_K8zrcl_s7X7x_3137eNalZRfDDQ"
+    "sig": "wJJxTn4IQGrDFNu_W6yBnpe5Sjm-S3QyD9JxzDJ1wwplzRwAfkgOMdwHMmuWuW0Gt5sFRFKDEq85bcBa9-DDDg"
   }
 }

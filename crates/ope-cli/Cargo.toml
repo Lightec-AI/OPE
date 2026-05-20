@@ -18,6 +18,7 @@ ope-crypto = { workspace = true }
 ope-envelope = { workspace = true }
 ope-server = { workspace = true }
 ope-transport = { workspace = true }
+ope-e2e = { workspace = true }
 tokio = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }

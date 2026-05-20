@@ -38,6 +38,8 @@ enum Commands {
     TransportTest,
     /// HKDF record-key derivation self-test
     HkdfTest,
+    /// Confidential AI E2E hybrid PQ round-trip self-test
+    E2eTest,
     /// Start mock attestation + verification HTTP server (§14)
     Serve {
         #[arg(long, default_value = "127.0.0.1:8080")]
@@ -64,6 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Keygen => cmd_keygen()?,
         Commands::TransportTest => cmd_transport_test()?,
         Commands::HkdfTest => cmd_hkdf_test()?,
+        Commands::E2eTest => cmd_e2e_test()?,
         Commands::Serve { addr } => cmd_serve(&addr)?,
     }
     Ok(())
@@ -132,6 +135,64 @@ fn cmd_hkdf_test() -> Result<(), Box<dyn std::error::Error>> {
         hex::encode(&keys.client_write_key[..4]),
         hex::encode(&keys.server_write_key[..4]),
     );
+    Ok(())
+}
+
+fn cmd_e2e_test() -> Result<(), Box<dyn std::error::Error>> {
+    use ope_crypto::mock_keypair_from_seed;
+    use ope_crypto::DEV_VECTOR_001_SEED;
+    use ope_e2e::{
+        begin_response_session, decrypt_request, decrypt_response_chunk, encrypt_request,
+        encrypt_response_chunk, mock_engine_from_seed, ClientSession, DEV_ENGINE_SEED,
+    };
+    use ope_envelope::{sign_envelope, Envelope};
+    use serde_json::json;
+
+    let (_, engine_pub) = mock_engine_from_seed(&DEV_ENGINE_SEED);
+    let (engine_secret, _) = mock_engine_from_seed(&DEV_ENGINE_SEED);
+    let client_session = ClientSession::generate()?;
+    let sender = mock_keypair_from_seed(&DEV_VECTOR_001_SEED);
+
+    let payload = json!({
+        "model": "gpt-4.1@openai",
+        "messages": [{"role": "user", "content": "confidential prompt"}]
+    });
+
+    let mut envelope = Envelope {
+        ope_version: Envelope::VERSION.into(),
+        alg: Envelope::ALG_EDDSA.into(),
+        enc: Envelope::ENC_NONE.into(),
+        kid: "sender-dev".into(),
+        recipient: "gateway-dev".into(),
+        engine_id: None,
+        ts: "2026-05-19T12:00:00Z".into(),
+        nonce: "bm9uY2VfZGV2X2UxZQ".into(),
+        payload_hash: String::new(),
+        payload: None,
+        ciphertext: None,
+        iv: None,
+        aad: None,
+        meta: Some(json!({"model": "gpt-4.1@openai", "tenant": "tenant-a"})),
+        e2e: None,
+        sig: None,
+    };
+
+    encrypt_request(&mut envelope, &engine_pub, &payload, Some(&client_session))?;
+    sign_envelope(&mut envelope, &sender.secret)?;
+    let decrypted = decrypt_request(&envelope, &engine_secret)?;
+    assert_eq!(decrypted, payload);
+
+    let (resp_key, iv, server) = begin_response_session(&engine_secret, &envelope, &client_session)?;
+    let chunk = encrypt_response_chunk(&resp_key, &iv, 0, b"stream-token")?;
+    let pt = decrypt_response_chunk(
+        &envelope,
+        &client_session,
+        &ope_crypto::encode(&server.bytes),
+        0,
+        &chunk,
+    )?;
+    assert_eq!(pt, b"stream-token");
+    println!("OK: Confidential AI E2E request + streaming response chunk");
     Ok(())
 }
 

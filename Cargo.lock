@@ -872,6 +872,7 @@ dependencies = [
  "clap",
  "hex",
  "ope-crypto",
+ "ope-e2e",
  "ope-envelope",
  "ope-server",
  "ope-transport",
@@ -902,6 +903,26 @@ dependencies = [
  "hex",
  "sha2",
  "thiserror",
+]
+
+[[package]]
+name = "ope-e2e"
+version = "0.1.0"
+dependencies = [
+ "chacha20poly1305",
+ "hkdf",
+ "kem",
+ "ml-kem",
+ "ope-crypto",
+ "ope-envelope",
+ "ope-transport",
+ "rand",
+ "rand_chacha",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "x25519-dalek",
 ]
 
 [[package]]

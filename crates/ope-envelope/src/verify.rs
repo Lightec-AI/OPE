@@ -18,10 +18,12 @@ pub struct VerifyOptions {
     pub seen_nonces: Option<HashSet<(String, String)>>,
     /// Gateway recipient binding (`ope.md` §4).
     pub expected_recipient: Option<String>,
-    /// Content encryption key for `enc != none`.
+    /// Content encryption key for gateway-local `enc` (not `e2e-hybrid-pq`).
     pub content_key: Option<[u8; 32]>,
     /// When true, require valid `payload.model` routing form (OPE-OpenAI).
     pub require_routed_model: bool,
+    /// Gateway opaque mode: verify signature only for `enc=e2e-hybrid-pq` (no decrypt).
+    pub opaque_e2e: bool,
 }
 
 impl VerifyOptions {
@@ -32,6 +34,7 @@ impl VerifyOptions {
             expected_recipient: None,
             content_key: None,
             require_routed_model: false,
+            opaque_e2e: false,
         }
     }
 }
@@ -76,8 +79,13 @@ pub fn verify_envelope(
     let message = signing_bytes(envelope)?;
     verify(public, &message, &sig_arr).map_err(|_| Error::InvalidSignature)?;
 
+    let is_opaque_e2e = envelope.enc == crate::envelope::Envelope::ENC_E2E_HYBRID_PQ
+        && options.opaque_e2e;
+
     let payload_for_hash = if envelope.enc == crate::envelope::Envelope::ENC_NONE {
         envelope.payload.clone()
+    } else if is_opaque_e2e {
+        None
     } else {
         let key = options
             .content_key
@@ -97,6 +105,16 @@ pub fn verify_envelope(
             } else {
                 return Err(Error::InvalidModelId("payload.model missing".into()));
             }
+        }
+    } else if options.require_routed_model && is_opaque_e2e {
+        if let Some(meta) = &envelope.meta {
+            if let Some(model) = meta.get("model").and_then(|m| m.as_str()) {
+                parse_routed_model(model)?;
+            } else {
+                return Err(Error::InvalidModelId("meta.model missing for opaque e2e".into()));
+            }
+        } else {
+            return Err(Error::InvalidModelId("meta.model missing for opaque e2e".into()));
         }
     }
 

@@ -118,6 +118,12 @@ pub fn signed_fields_object(envelope: &Envelope) -> Result<Value, Error> {
     if let Some(aad) = &envelope.aad {
         obj["aad"] = aad.clone();
     }
+    if let Some(engine_id) = &envelope.engine_id {
+        obj["engine_id"] = serde_json::json!(engine_id);
+    }
+    if let Some(e2e) = &envelope.e2e {
+        obj["e2e"] = e2e.clone();
+    }
 
     Ok(obj)
 }
