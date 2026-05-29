@@ -1035,6 +1035,7 @@ dependencies = [
  "ope-transport",
  "serde",
  "serde_json",
+ "zeroize",
 ]
 
 [[package]]

@@ -10,8 +10,9 @@
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 
 use ope_crypto::{decode, encode, public_key_from_bytes};
 use ope_e2e::{
@@ -20,19 +21,30 @@ use ope_e2e::{
 };
 use ope_envelope::Envelope;
 use serde_json::{json, Value};
+use zeroize::ZeroizeOnDrop;
 
-use crate::error::{set_last_error_code, OPE_ERR_CRYPTO, OPE_ERR_INVALID_ARG, OPE_ERR_JSON, OPE_OK};
+use crate::error::{
+    set_last_error_code, OPE_ERR_CRYPTO, OPE_ERR_INTERNAL, OPE_ERR_INVALID_ARG, OPE_ERR_JSON, OPE_OK,
+};
 
+/// Derived response-stream key + IV. The key is zeroized on drop (SEC-028); the IV is not
+/// secret but is small enough to clear alongside it.
+#[derive(ZeroizeOnDrop)]
 struct ResponseSession {
     key: [u8; 32],
     iv: [u8; 12],
 }
 
+/// Secrets are held behind `Arc` so a caller can clone the handle out under a short critical
+/// section and run the (potentially slow, attacker-influenced) crypto **without** holding the
+/// global registry lock. This avoids serializing all crypto on one mutex and, combined with the
+/// `catch_unwind` guards below, prevents a panic from poisoning the lock and wedging the process
+/// (SEC-020).
 #[derive(Default)]
 struct Registries {
-    engines: HashMap<u64, EngineStaticSecret>,
-    clients: HashMap<u64, ClientSession>,
-    responses: HashMap<u64, ResponseSession>,
+    engines: HashMap<u64, Arc<EngineStaticSecret>>,
+    clients: HashMap<u64, Arc<ClientSession>>,
+    responses: HashMap<u64, Arc<ResponseSession>>,
 }
 
 static REG: OnceLock<Mutex<Registries>> = OnceLock::new();
@@ -42,6 +54,12 @@ fn registries() -> &'static Mutex<Registries> {
     REG.get_or_init(|| Mutex::new(Registries::default()))
 }
 
+/// Acquire the registry lock, recovering from a poisoned mutex instead of panicking. The data
+/// behind the lock is plain handle maps (no broken invariant), so recovery is safe.
+fn lock_registries() -> MutexGuard<'static, Registries> {
+    registries().lock().unwrap_or_else(|e| e.into_inner())
+}
+
 fn next_handle() -> u64 {
     COUNTER.fetch_add(1, Ordering::Relaxed)
 }
@@ -49,6 +67,23 @@ fn next_handle() -> u64 {
 fn err_null(code: i32, msg: impl Into<String>) -> *mut c_char {
     set_last_error_code(code, msg);
     std::ptr::null_mut()
+}
+
+/// Run a pointer-returning FFI body with panic isolation. A panic must never unwind across the
+/// C ABI (UB / process abort); convert it to a null + last-error instead (SEC-020).
+fn guard_ptr(op: &str, f: impl FnOnce() -> *mut c_char) -> *mut c_char {
+    match catch_unwind(AssertUnwindSafe(f)) {
+        Ok(p) => p,
+        Err(_) => err_null(OPE_ERR_INTERNAL, format!("panic in {op}")),
+    }
+}
+
+/// Run a status-returning FFI body with panic isolation.
+fn guard_status(f: impl FnOnce() -> i32) -> i32 {
+    match catch_unwind(AssertUnwindSafe(f)) {
+        Ok(c) => c,
+        Err(_) => OPE_ERR_INTERNAL,
+    }
 }
 
 fn json_out(value: Value) -> *mut c_char {
@@ -87,44 +122,48 @@ pub extern "C" fn ope_e2e_engine_generate(
     engine_id: *const c_char,
     ed25519_public_b64: *const c_char,
 ) -> *mut c_char {
-    let engine_id = match read_str(engine_id, "engine_id") {
-        Ok(s) => s.to_string(),
-        Err(p) => return p,
-    };
-    let ed_b64 = match read_str(ed25519_public_b64, "ed25519_public_b64") {
-        Ok(s) => s,
-        Err(p) => return p,
-    };
-    let ed_bytes = match decode(ed_b64) {
-        Ok(b) => b,
-        Err(_) => return err_null(OPE_ERR_INVALID_ARG, "ed25519_public_b64 not base64url"),
-    };
-    let ed_arr: [u8; 32] = match ed_bytes.try_into() {
-        Ok(a) => a,
-        Err(_) => return err_null(OPE_ERR_INVALID_ARG, "ed25519_public must be 32 bytes"),
-    };
-    let ed_public = match public_key_from_bytes(&ed_arr) {
-        Ok(p) => p,
-        Err(_) => return err_null(OPE_ERR_CRYPTO, "invalid ed25519 public key"),
-    };
-    let (secret, identity) = match EngineStaticSecret::generate(engine_id, ed_public) {
-        Ok(v) => v,
-        Err(e) => return err_null(OPE_ERR_CRYPTO, format!("engine generate: {e}")),
-    };
-    let handle = next_handle();
-    registries().lock().unwrap().engines.insert(handle, secret);
-    let identity_json = match serde_json::to_value(&identity) {
-        Ok(v) => v,
-        Err(e) => return err_null(OPE_ERR_JSON, format!("identity serialize: {e}")),
-    };
-    json_out(json!({ "handle": handle, "identity": identity_json }))
+    guard_ptr("ope_e2e_engine_generate", || {
+        let engine_id = match read_str(engine_id, "engine_id") {
+            Ok(s) => s.to_string(),
+            Err(p) => return p,
+        };
+        let ed_b64 = match read_str(ed25519_public_b64, "ed25519_public_b64") {
+            Ok(s) => s,
+            Err(p) => return p,
+        };
+        let ed_bytes = match decode(ed_b64) {
+            Ok(b) => b,
+            Err(_) => return err_null(OPE_ERR_INVALID_ARG, "ed25519_public_b64 not base64url"),
+        };
+        let ed_arr: [u8; 32] = match ed_bytes.try_into() {
+            Ok(a) => a,
+            Err(_) => return err_null(OPE_ERR_INVALID_ARG, "ed25519_public must be 32 bytes"),
+        };
+        let ed_public = match public_key_from_bytes(&ed_arr) {
+            Ok(p) => p,
+            Err(_) => return err_null(OPE_ERR_CRYPTO, "invalid ed25519 public key"),
+        };
+        let (secret, identity) = match EngineStaticSecret::generate(engine_id, ed_public) {
+            Ok(v) => v,
+            Err(e) => return err_null(OPE_ERR_CRYPTO, format!("engine generate: {e}")),
+        };
+        let identity_json = match serde_json::to_value(&identity) {
+            Ok(v) => v,
+            Err(e) => return err_null(OPE_ERR_JSON, format!("identity serialize: {e}")),
+        };
+        let handle = next_handle();
+        lock_registries().engines.insert(handle, Arc::new(secret));
+        json_out(json!({ "handle": handle, "identity": identity_json }))
+    })
 }
 
 /// Free an engine epoch handle. Returns `OPE_OK` even if the handle was unknown.
 #[no_mangle]
 pub extern "C" fn ope_e2e_engine_free(handle: u64) -> i32 {
-    registries().lock().unwrap().engines.remove(&handle);
-    OPE_OK
+    guard_status(|| {
+        lock_registries().engines.remove(&handle);
+        OPE_OK
+    })
 }
 
 /// Engine: decrypt a request envelope. Returns the plaintext payload JSON.
@@ -133,19 +172,21 @@ pub extern "C" fn ope_e2e_engine_decrypt_request(
     handle: u64,
     envelope_json: *const c_char,
 ) -> *mut c_char {
-    let envelope: Envelope = match read_json(envelope_json, "envelope") {
-        Ok(v) => v,
-        Err(p) => return p,
-    };
-    let guard = registries().lock().unwrap();
-    let engine = match guard.engines.get(&handle) {
-        Some(e) => e,
-        None => return err_null(OPE_ERR_INVALID_ARG, "unknown engine handle"),
-    };
-    match decrypt_request(&envelope, engine) {
-        Ok(payload) => json_out(payload),
-        Err(e) => err_null(OPE_ERR_CRYPTO, format!("decrypt_request: {e}")),
-    }
+    guard_ptr("ope_e2e_engine_decrypt_request", || {
+        let envelope: Envelope = match read_json(envelope_json, "envelope") {
+            Ok(v) => v,
+            Err(p) => return p,
+        };
+        // Clone the Arc under a short lock, then decrypt without holding the registry mutex.
+        let engine = match lock_registries().engines.get(&handle).cloned() {
+            Some(e) => e,
+            None => return err_null(OPE_ERR_INVALID_ARG, "unknown engine handle"),
+        };
+        match decrypt_request(&envelope, &engine) {
+            Ok(payload) => json_out(payload),
+            Err(e) => err_null(OPE_ERR_CRYPTO, format!("decrypt_request: {e}")),
+        }
+    })
 }
 
 /// Engine: begin a streaming response session bound to the request's client share.
@@ -155,41 +196,44 @@ pub extern "C" fn ope_e2e_engine_begin_response(
     handle: u64,
     request_envelope_json: *const c_char,
 ) -> *mut c_char {
-    let envelope: Envelope = match read_json(request_envelope_json, "request_envelope") {
-        Ok(v) => v,
-        Err(p) => return p,
-    };
-    let e2e_val = match envelope.e2e.clone() {
-        Some(v) => v,
-        None => return err_null(OPE_ERR_INVALID_ARG, "request envelope missing e2e"),
-    };
-    let e2e: E2eFields = match serde_json::from_value(e2e_val) {
-        Ok(v) => v,
-        Err(e) => return err_null(OPE_ERR_JSON, format!("e2e parse: {e}")),
-    };
-    let client_share = match e2e.client_share.as_deref() {
-        Some(s) => s,
-        None => {
-            return err_null(
-                OPE_ERR_INVALID_ARG,
-                "request e2e.client_share required for response session",
-            )
-        }
-    };
-    let mut guard = registries().lock().unwrap();
-    let engine = match guard.engines.get(&handle) {
-        Some(e) => e,
-        None => return err_null(OPE_ERR_INVALID_ARG, "unknown engine handle"),
-    };
-    let (key, iv, server) =
-        match begin_response_session_from_share(engine, &envelope, client_share) {
+    guard_ptr("ope_e2e_engine_begin_response", || {
+        let envelope: Envelope = match read_json(request_envelope_json, "request_envelope") {
             Ok(v) => v,
-            Err(e) => return err_null(OPE_ERR_CRYPTO, format!("begin_response: {e}")),
+            Err(p) => return p,
         };
-    let server_share = encode(&server.bytes);
-    let session = next_handle();
-    guard.responses.insert(session, ResponseSession { key, iv });
-    json_out(json!({ "session": session, "server_share": server_share }))
+        let e2e_val = match envelope.e2e.clone() {
+            Some(v) => v,
+            None => return err_null(OPE_ERR_INVALID_ARG, "request envelope missing e2e"),
+        };
+        let e2e: E2eFields = match serde_json::from_value(e2e_val) {
+            Ok(v) => v,
+            Err(e) => return err_null(OPE_ERR_JSON, format!("e2e parse: {e}")),
+        };
+        let client_share = match e2e.client_share.as_deref() {
+            Some(s) => s,
+            None => {
+                return err_null(
+                    OPE_ERR_INVALID_ARG,
+                    "request e2e.client_share required for response session",
+                )
+            }
+        };
+        let engine = match lock_registries().engines.get(&handle).cloned() {
+            Some(e) => e,
+            None => return err_null(OPE_ERR_INVALID_ARG, "unknown engine handle"),
+        };
+        let (key, iv, server) =
+            match begin_response_session_from_share(&engine, &envelope, client_share) {
+                Ok(v) => v,
+                Err(e) => return err_null(OPE_ERR_CRYPTO, format!("begin_response: {e}")),
+            };
+        let server_share = encode(&server.bytes);
+        let session = next_handle();
+        lock_registries()
+            .responses
+            .insert(session, Arc::new(ResponseSession { key, iv }));
+        json_out(json!({ "session": session, "server_share": server_share }))
+    })
 }
 
 /// Engine: encrypt one response stream chunk. `plaintext_b64` is base64url of raw bytes.
@@ -200,30 +244,33 @@ pub extern "C" fn ope_e2e_response_encrypt_chunk(
     seq: u32,
     plaintext_b64: *const c_char,
 ) -> *mut c_char {
-    let pt_b64 = match read_str(plaintext_b64, "plaintext_b64") {
-        Ok(s) => s,
-        Err(p) => return p,
-    };
-    let plaintext = match decode(pt_b64) {
-        Ok(b) => b,
-        Err(_) => return err_null(OPE_ERR_INVALID_ARG, "plaintext_b64 not base64url"),
-    };
-    let guard = registries().lock().unwrap();
-    let sess = match guard.responses.get(&session) {
-        Some(s) => s,
-        None => return err_null(OPE_ERR_INVALID_ARG, "unknown response session"),
-    };
-    match encrypt_response_chunk(&sess.key, &sess.iv, seq, &plaintext) {
-        Ok(ct) => json_out(json!({ "ciphertext": ct })),
-        Err(e) => err_null(OPE_ERR_CRYPTO, format!("encrypt_chunk: {e}")),
-    }
+    guard_ptr("ope_e2e_response_encrypt_chunk", || {
+        let pt_b64 = match read_str(plaintext_b64, "plaintext_b64") {
+            Ok(s) => s,
+            Err(p) => return p,
+        };
+        let plaintext = match decode(pt_b64) {
+            Ok(b) => b,
+            Err(_) => return err_null(OPE_ERR_INVALID_ARG, "plaintext_b64 not base64url"),
+        };
+        let sess = match lock_registries().responses.get(&session).cloned() {
+            Some(s) => s,
+            None => return err_null(OPE_ERR_INVALID_ARG, "unknown response session"),
+        };
+        match encrypt_response_chunk(&sess.key, &sess.iv, seq, &plaintext) {
+            Ok(ct) => json_out(json!({ "ciphertext": ct })),
+            Err(e) => err_null(OPE_ERR_CRYPTO, format!("encrypt_chunk: {e}")),
+        }
+    })
 }
 
 /// Free a response session handle.
 #[no_mangle]
 pub extern "C" fn ope_e2e_response_free(session: u64) -> i32 {
-    registries().lock().unwrap().responses.remove(&session);
-    OPE_OK
+    guard_status(|| {
+        lock_registries().responses.remove(&session);
+        OPE_OK
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -244,47 +291,49 @@ pub extern "C" fn ope_e2e_client_encrypt_request(
     base_envelope_json: *const c_char,
     want_response_session: i32,
 ) -> *mut c_char {
-    let engine: EngineIdentity = match read_json(engine_identity_json, "engine_identity") {
-        Ok(v) => v,
-        Err(p) => return p,
-    };
-    let payload: Value = match read_json(payload_json, "payload") {
-        Ok(v) => v,
-        Err(p) => return p,
-    };
-    let mut envelope: Envelope = match read_json(base_envelope_json, "base_envelope") {
-        Ok(v) => v,
-        Err(p) => return p,
-    };
+    guard_ptr("ope_e2e_client_encrypt_request", || {
+        let engine: EngineIdentity = match read_json(engine_identity_json, "engine_identity") {
+            Ok(v) => v,
+            Err(p) => return p,
+        };
+        let payload: Value = match read_json(payload_json, "payload") {
+            Ok(v) => v,
+            Err(p) => return p,
+        };
+        let mut envelope: Envelope = match read_json(base_envelope_json, "base_envelope") {
+            Ok(v) => v,
+            Err(p) => return p,
+        };
 
-    let session = if want_response_session != 0 {
-        match ClientSession::generate() {
-            Ok(s) => Some(s),
-            Err(e) => return err_null(OPE_ERR_CRYPTO, format!("client session: {e}")),
+        let session = if want_response_session != 0 {
+            match ClientSession::generate() {
+                Ok(s) => Some(s),
+                Err(e) => return err_null(OPE_ERR_CRYPTO, format!("client session: {e}")),
+            }
+        } else {
+            None
+        };
+
+        if let Err(e) = encrypt_request(&mut envelope, &engine, &payload, session.as_ref()) {
+            return err_null(OPE_ERR_CRYPTO, format!("encrypt_request: {e}"));
         }
-    } else {
-        None
-    };
 
-    if let Err(e) = encrypt_request(&mut envelope, &engine, &payload, session.as_ref()) {
-        return err_null(OPE_ERR_CRYPTO, format!("encrypt_request: {e}"));
-    }
+        let envelope_json = match serde_json::to_value(&envelope) {
+            Ok(v) => v,
+            Err(e) => return err_null(OPE_ERR_JSON, format!("envelope serialize: {e}")),
+        };
 
-    let envelope_json = match serde_json::to_value(&envelope) {
-        Ok(v) => v,
-        Err(e) => return err_null(OPE_ERR_JSON, format!("envelope serialize: {e}")),
-    };
+        let session_handle = session.map(|s| {
+            let h = next_handle();
+            lock_registries().clients.insert(h, Arc::new(s));
+            h
+        });
 
-    let session_handle = session.map(|s| {
-        let h = next_handle();
-        registries().lock().unwrap().clients.insert(h, s);
-        h
-    });
-
-    json_out(json!({
-        "envelope": envelope_json,
-        "client_session": session_handle,
-    }))
+        json_out(json!({
+            "envelope": envelope_json,
+            "client_session": session_handle,
+        }))
+    })
 }
 
 /// Client: decrypt one response stream chunk. Returns `{ "plaintext_b64": <base64url> }`.
@@ -296,34 +345,37 @@ pub extern "C" fn ope_e2e_client_decrypt_response_chunk(
     seq: u32,
     ciphertext_b64: *const c_char,
 ) -> *mut c_char {
-    let request: Envelope = match read_json(request_envelope_json, "request_envelope") {
-        Ok(v) => v,
-        Err(p) => return p,
-    };
-    let server_share = match read_str(server_share_b64, "server_share_b64") {
-        Ok(s) => s.to_string(),
-        Err(p) => return p,
-    };
-    let ciphertext = match read_str(ciphertext_b64, "ciphertext_b64") {
-        Ok(s) => s.to_string(),
-        Err(p) => return p,
-    };
-    let guard = registries().lock().unwrap();
-    let session = match guard.clients.get(&client_session) {
-        Some(s) => s,
-        None => return err_null(OPE_ERR_INVALID_ARG, "unknown client session"),
-    };
-    match decrypt_response_chunk(&request, session, &server_share, seq, &ciphertext) {
-        Ok(pt) => json_out(json!({ "plaintext_b64": encode(&pt) })),
-        Err(e) => err_null(OPE_ERR_CRYPTO, format!("decrypt_response_chunk: {e}")),
-    }
+    guard_ptr("ope_e2e_client_decrypt_response_chunk", || {
+        let request: Envelope = match read_json(request_envelope_json, "request_envelope") {
+            Ok(v) => v,
+            Err(p) => return p,
+        };
+        let server_share = match read_str(server_share_b64, "server_share_b64") {
+            Ok(s) => s.to_string(),
+            Err(p) => return p,
+        };
+        let ciphertext = match read_str(ciphertext_b64, "ciphertext_b64") {
+            Ok(s) => s.to_string(),
+            Err(p) => return p,
+        };
+        let session = match lock_registries().clients.get(&client_session).cloned() {
+            Some(s) => s,
+            None => return err_null(OPE_ERR_INVALID_ARG, "unknown client session"),
+        };
+        match decrypt_response_chunk(&request, &session, &server_share, seq, &ciphertext) {
+            Ok(pt) => json_out(json!({ "plaintext_b64": encode(&pt) })),
+            Err(e) => err_null(OPE_ERR_CRYPTO, format!("decrypt_response_chunk: {e}")),
+        }
+    })
 }
 
 /// Free a client session handle.
 #[no_mangle]
 pub extern "C" fn ope_e2e_client_session_free(client_session: u64) -> i32 {
-    registries().lock().unwrap().clients.remove(&client_session);
-    OPE_OK
+    guard_status(|| {
+        lock_registries().clients.remove(&client_session);
+        OPE_OK
+    })
 }
 
 #[cfg(test)]
@@ -435,5 +487,101 @@ mod tests {
         });
         let out = ope_e2e_engine_decrypt_request(987654, cstr(&env.to_string()).as_ptr());
         assert!(out.is_null());
+    }
+
+    #[test]
+    fn null_and_invalid_inputs_error_without_panic() {
+        // Null pointers must not deref-panic.
+        assert!(ope_e2e_engine_generate(std::ptr::null(), std::ptr::null()).is_null());
+        assert!(
+            ope_e2e_engine_decrypt_request(1, std::ptr::null()).is_null(),
+            "null envelope"
+        );
+        // Malformed JSON envelope.
+        let bad = cstr("{not json");
+        assert!(ope_e2e_engine_decrypt_request(1, bad.as_ptr()).is_null());
+        // Unknown sessions on every handle-based call.
+        let env = cstr(&json!({"ope_version":"1.0","alg":"EdDSA","enc":"none","kid":"k","recipient":"r","ts":"2026-05-29T09:00:00Z","nonce":"n","payload_hash":""}).to_string());
+        assert!(ope_e2e_engine_begin_response(424242, env.as_ptr()).is_null());
+        assert!(ope_e2e_response_encrypt_chunk(424242, 0, cstr(&encode(b"x")).as_ptr()).is_null());
+        assert!(ope_e2e_client_decrypt_response_chunk(
+            424242,
+            env.as_ptr(),
+            cstr("AAAA").as_ptr(),
+            0,
+            cstr("AAAA").as_ptr(),
+        )
+        .is_null());
+    }
+
+    #[test]
+    fn free_is_idempotent_and_unknown_safe() {
+        // Free on never-seen handles returns OK (no panic / no poison).
+        assert_eq!(ope_e2e_engine_free(111111), OPE_OK);
+        assert_eq!(ope_e2e_response_free(111111), OPE_OK);
+        assert_eq!(ope_e2e_client_session_free(111111), OPE_OK);
+        // Double free is safe.
+        let kp = mock_keypair_from_seed(&DEV_VECTOR_001_SEED);
+        let gen = unsafe {
+            take_json(ope_e2e_engine_generate(
+                cstr("dbl").as_ptr(),
+                cstr(&encode(kp.public.as_bytes())).as_ptr(),
+            ))
+        };
+        let h = gen["handle"].as_u64().unwrap();
+        assert_eq!(ope_e2e_engine_free(h), OPE_OK);
+        assert_eq!(ope_e2e_engine_free(h), OPE_OK);
+    }
+
+    #[test]
+    fn lock_recovers_from_poison() {
+        // Poison the registry mutex deliberately, then confirm FFI calls still work
+        // (poison recovery via `lock_registries`), proving a panic-while-locked elsewhere
+        // cannot wedge the whole process.
+        let _ = catch_unwind(AssertUnwindSafe(|| {
+            let _g = registries().lock().unwrap();
+            panic!("force poison");
+        }));
+        assert!(registries().is_poisoned());
+
+        let kp = mock_keypair_from_seed(&DEV_VECTOR_001_SEED);
+        let gen = unsafe {
+            take_json(ope_e2e_engine_generate(
+                cstr("after-poison").as_ptr(),
+                cstr(&encode(kp.public.as_bytes())).as_ptr(),
+            ))
+        };
+        let h = gen["handle"].as_u64().unwrap();
+        assert_eq!(ope_e2e_engine_free(h), OPE_OK);
+    }
+
+    #[test]
+    fn concurrent_engine_generate_is_thread_safe() {
+        use std::thread;
+        let kp = mock_keypair_from_seed(&DEV_VECTOR_001_SEED);
+        let ed = encode(kp.public.as_bytes());
+        let handles: Vec<_> = (0..8)
+            .map(|i| {
+                let ed = ed.clone();
+                thread::spawn(move || {
+                    let gen = unsafe {
+                        take_json(ope_e2e_engine_generate(
+                            cstr(&format!("eng-{i}")).as_ptr(),
+                            cstr(&ed).as_ptr(),
+                        ))
+                    };
+                    gen["handle"].as_u64().unwrap()
+                })
+            })
+            .collect();
+        let ids: Vec<u64> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+        // All handles unique and freeable.
+        let mut sorted = ids.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), ids.len(), "handles must be unique");
+        for h in ids {
+            assert_eq!(ope_e2e_engine_free(h), OPE_OK);
+        }
     }
 }
