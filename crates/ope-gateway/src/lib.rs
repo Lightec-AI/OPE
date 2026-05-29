@@ -1,6 +1,7 @@
 //! OPE gateway: verify envelopes, optional attestation, strip `model@provider` for upstream APIs.
 
 use std::collections::HashSet;
+use std::time::Duration;
 
 use ope_attest::{
     allow_verdict, checks_from_results, deny_verdict, verify_attestation, Attestation,
@@ -27,6 +28,8 @@ pub struct GatewayConfig {
     pub content_key: Option<[u8; 32]>,
     pub require_attestation: bool,
     pub require_routed_model: bool,
+    /// Maximum clock skew accepted on envelope `ts` (production default ±300s).
+    pub max_timestamp_skew: Duration,
 }
 
 impl Default for GatewayConfig {
@@ -36,6 +39,7 @@ impl Default for GatewayConfig {
             content_key: Some(ope_crypto::DEV_CONTENT_KEY),
             require_attestation: false,
             require_routed_model: true,
+            max_timestamp_skew: Duration::from_secs(300),
         }
     }
 }
@@ -70,7 +74,7 @@ pub fn verify_envelope_request(
         &envelope,
         &sender_kp.public,
         &VerifyOptions {
-            max_skew: std::time::Duration::from_secs(300),
+            max_skew: config.max_timestamp_skew,
             seen_nonces: Some(seen_nonces.clone()),
             expected_recipient: Some(config.gateway_id.clone()),
             content_key: if envelope.enc == ope_envelope::Envelope::ENC_E2E_HYBRID_PQ {

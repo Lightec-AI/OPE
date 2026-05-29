@@ -1,10 +1,14 @@
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
+use std::time::Duration;
 
 use ope_crypto::{mock_keypair_from_seed, DEV_CONTENT_KEY, DEV_VECTOR_001_SEED};
 use ope_envelope::{verify_envelope, VerifyOptions};
 use serde::Deserialize;
+
+/// Spec vectors carry a fixed `ts` for reproducible signatures; allow a wide skew in tests only.
+const DEV_VECTOR_MAX_SKEW: Duration = Duration::from_secs(60 * 60 * 24 * 365);
 
 #[derive(Deserialize)]
 struct VectorFile {
@@ -55,7 +59,7 @@ fn all_spec_vectors() {
             &vector.envelope,
             &kp.public,
             &VerifyOptions {
-                max_skew: std::time::Duration::from_secs(300),
+                max_skew: DEV_VECTOR_MAX_SKEW,
                 seen_nonces: None,
                 expected_recipient,
                 content_key,
@@ -90,12 +94,14 @@ fn vector_003_replay_detected() {
     let kp = mock_keypair_from_seed(&DEV_VECTOR_001_SEED);
     let mut cache = HashSet::new();
     let opts = VerifyOptions {
+        max_skew: DEV_VECTOR_MAX_SKEW,
         seen_nonces: Some(cache.clone()),
         ..VerifyOptions::with_defaults()
     };
     verify_envelope(&vector.envelope, &kp.public, &opts).unwrap();
     cache.insert((vector.envelope.kid.clone(), vector.envelope.nonce.clone()));
     let opts2 = VerifyOptions {
+        max_skew: DEV_VECTOR_MAX_SKEW,
         seen_nonces: Some(cache),
         ..VerifyOptions::with_defaults()
     };

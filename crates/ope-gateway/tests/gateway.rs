@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::time::Duration;
 
 use ope_attest::VerifyEnvelopeRequest;
 use ope_gateway::{normalize_payload_for_provider, strip_provider_suffix, verify_envelope_request, GatewayConfig};
@@ -23,7 +24,12 @@ fn verify_allow_and_normalize() {
         attestation: None,
         policy_context: None,
     };
-    let verdict = verify_envelope_request(&req, &GatewayConfig::default(), &mut cache).unwrap();
+    // Spec vector 001 uses a fixed historical `ts`; relax skew for this dev-only fixture.
+    let config = GatewayConfig {
+        max_timestamp_skew: Duration::from_secs(60 * 60 * 24 * 365),
+        ..GatewayConfig::default()
+    };
+    let verdict = verify_envelope_request(&req, &config, &mut cache).unwrap();
     assert!(verdict.verified);
     let payload = v["envelope"]["payload"].clone();
     let normalized = normalize_payload_for_provider(&payload).unwrap();
