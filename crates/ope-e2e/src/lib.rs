@@ -24,6 +24,7 @@ pub use kex::{
 pub use mock::{mock_engine_from_seed, DEV_ENGINE_SEED};
 pub use request::{decrypt_request, encrypt_request, ENC_E2E_HYBRID_PQ};
 pub use response::{
-    begin_response_session, decrypt_response_chunk, encrypt_response_chunk, e2e_with_server_share,
+    begin_response_session, begin_response_session_from_share, decrypt_response_chunk,
+    encrypt_response_chunk, e2e_with_server_share,
 };
 pub use stream::{decrypt_chunk, encrypt_chunk};

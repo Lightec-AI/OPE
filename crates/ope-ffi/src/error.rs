@@ -40,6 +40,20 @@ pub extern "C" fn ope_last_error_message(buf: *mut c_char, buflen: usize) -> i32
     bytes.len() as i32
 }
 
+/// Allocate and return the last error message as a NUL-terminated C string.
+/// Returns null when there is no message. Free with [`ope_string_free`].
+#[no_mangle]
+pub extern "C" fn ope_last_error_alloc() -> *mut c_char {
+    let msg = LAST_ERROR.with(|e| e.borrow().clone());
+    if msg.is_empty() {
+        return std::ptr::null_mut();
+    }
+    match CString::new(msg) {
+        Ok(c) => c.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn ope_string_free(s: *mut c_char) {
     if !s.is_null() {

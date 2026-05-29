@@ -1028,8 +1028,12 @@ dependencies = [
 name = "ope-ffi"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "ope-crypto",
+ "ope-e2e",
  "ope-envelope",
+ "ope-transport",
+ "serde",
  "serde_json",
 ]
 

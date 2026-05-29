@@ -62,13 +62,30 @@ impl ServerKeyExchange {
     pub fn respond_to(
         client: &ClientKeyExchange,
     ) -> Result<(Self, [u8; X25519MLKEM768_SHARED_SECRET_LEN]), Error> {
-        let encap_key = parse_encapsulation_key(&client.bytes[..MLKEM768_ENCAPSULATION_KEY_LEN])?;
-        let client_x25519_bytes: [u8; X25519_SHARE_LEN] = client.bytes
+        Self::respond_to_share(&client.bytes)
+    }
+
+    /// Engine-side response using only the **public** client `key_exchange` share
+    /// (`ML-KEM encapsulation key || X25519 ephemeral public`, 1216 bytes).
+    ///
+    /// The responder never needs the client's secret material, so this is the
+    /// function a server/engine calls with bytes received over the wire.
+    pub fn respond_to_share(
+        client_share: &[u8],
+    ) -> Result<(Self, [u8; X25519MLKEM768_SHARED_SECRET_LEN]), Error> {
+        if client_share.len() != X25519MLKEM768_CLIENT_SHARE_LEN {
+            return Err(Error::InvalidShareLength {
+                expected: X25519MLKEM768_CLIENT_SHARE_LEN,
+                actual: client_share.len(),
+            });
+        }
+        let encap_key = parse_encapsulation_key(&client_share[..MLKEM768_ENCAPSULATION_KEY_LEN])?;
+        let client_x25519_bytes: [u8; X25519_SHARE_LEN] = client_share
             [MLKEM768_ENCAPSULATION_KEY_LEN..]
             .try_into()
             .map_err(|_| Error::InvalidShareLength {
                 expected: X25519_SHARE_LEN,
-                actual: client.bytes.len() - MLKEM768_ENCAPSULATION_KEY_LEN,
+                actual: client_share.len() - MLKEM768_ENCAPSULATION_KEY_LEN,
             })?;
 
         let (ciphertext, mlkem_ss) = encap_key.encapsulate();

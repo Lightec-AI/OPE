@@ -32,6 +32,29 @@ pub fn begin_response_session(
     Ok((key, iv, server))
 }
 
+/// Engine: derive response key from only the **public** client share bytes
+/// (`e2e.client_share` on the request), without needing a full [`ClientSession`].
+///
+/// This is the function a real engine calls: it holds no client secret, only the
+/// ephemeral share received on the wire.
+pub fn begin_response_session_from_share(
+    engine: &EngineStaticSecret,
+    request: &Envelope,
+    client_share_b64: &str,
+) -> Result<([u8; 32], [u8; 12], ServerKeyExchange), Error> {
+    let share = ope_crypto::decode(client_share_b64)
+        .map_err(|_| Error::E2e("client_share".into()))?;
+    let (server, shared) = ServerKeyExchange::respond_to_share(&share)?;
+    let key = derive_response_content_key(&shared, &engine.engine_id, &request.kid, &request.nonce)?;
+    let iv_b64 = request
+        .iv
+        .as_ref()
+        .ok_or_else(|| Error::E2e("request iv".into()))?;
+    let iv_bytes = ope_crypto::decode(iv_b64).map_err(|_| Error::E2e("iv".into()))?;
+    let iv: [u8; 12] = iv_bytes.try_into().map_err(|_| Error::E2e("iv len".into()))?;
+    Ok((key, iv, server))
+}
+
 /// Encrypt one response stream chunk.
 pub fn encrypt_response_chunk(
     key: &[u8; 32],

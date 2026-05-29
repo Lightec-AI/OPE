@@ -1,8 +1,13 @@
 //! Engine and client hybrid identity material.
 
-use kem::{Decapsulate, KeyExport};
-use ml_kem::{array::Array, ml_kem_768::{Ciphertext, EncapsulationKey}};
+use kem::{Decapsulate, Kem, KeyExport};
+use ml_kem::{
+    array::Array,
+    ml_kem_768::{Ciphertext, EncapsulationKey},
+    ExpandedDecapsulationKey, ExpandedKeyEncoding, MlKem768,
+};
 use ope_crypto::{encode, PublicKey};
+use rand::rngs::OsRng;
 use ope_transport::{
     parse_decapsulation_key, ClientKeyExchange, MLKEM768_ENCAPSULATION_KEY_LEN, X25519_SHARE_LEN,
 };
@@ -66,6 +71,29 @@ impl EngineStaticSecret {
             x25519_secret: StaticSecret::from(x25519_secret),
             ed25519_public,
         })
+    }
+
+    /// Generate a fresh production engine epoch secret (real ML-KEM-768 + X25519 keypairs)
+    /// using the operating-system CSPRNG. Returns the secret (held in RAM, TEE-only in
+    /// production) and the publishable [`EngineIdentity`].
+    ///
+    /// The `ed25519_public` is the engine's long-term signing key (used for usage-report and
+    /// ephemeral-identity signatures); it is carried in the identity for client binding.
+    pub fn generate(
+        engine_id: impl Into<String>,
+        ed25519_public: PublicKey,
+    ) -> Result<(Self, EngineIdentity), crate::Error> {
+        let (decaps, _encaps) = MlKem768::generate_keypair();
+        #[allow(deprecated)]
+        let expanded: ExpandedDecapsulationKey<MlKem768> = decaps.to_expanded_bytes();
+        let mlkem_decaps: Vec<u8> = expanded.iter().copied().collect();
+
+        let x25519_secret = StaticSecret::random_from_rng(OsRng);
+        let x25519_bytes = x25519_secret.to_bytes();
+
+        let secret = Self::from_bytes(engine_id, &mlkem_decaps, x25519_bytes, ed25519_public)?;
+        let identity = secret.public_identity()?;
+        Ok((secret, identity))
     }
 
     pub fn public_identity(&self) -> Result<EngineIdentity, crate::Error> {
