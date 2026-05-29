@@ -60,7 +60,7 @@ flowchart TB
 | L3 | **`ope-e2e`** | `spec/ope-confidential-ai.md` | **Reference** (mock engine) |
 | L1 | TLS | — | **External** (no OPE fork) |
 | L4 | `ope-gateway`, `ope-attest`, `ope-server` | §14, confidential-ai | Gateway opaque mode done |
-| L5 | `ope-ffi`, `bindings/*` | — | Envelope only; E2E FFI planned |
+| L5 | `ope-ffi`, `bindings/*` | — | Envelope + hybrid E2E (`ope_e2e_*`) C ABI; WASM planned |
 
 `ope-transport` provides **X25519MLKEM768** math shared with TLS PQ drafts; production TLS uses s2n/BoringSSL directly. **Application E2E** uses `ope-e2e` HKDF labels, not TLS record keys.
 

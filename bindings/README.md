@@ -38,7 +38,20 @@ C example: [`c/example/verify_vector.c`](c/example/verify_vector.c).
 - `ope_envelope_verify(public_key[32], json, max_skew_secs)`
 - `ope_envelope_verify_dev_json(json)` — dev vector-001 mock key only
 
-Transport (`X25519MLKEM768`) and attestation APIs are not exposed in FFI yet; use Rust crates `ope-transport` / `ope-attest` or wait for P2.
+## API (hybrid E2E — `X25519MLKEM768` + ChaCha20-Poly1305)
+
+Secrets stay in the Rust process behind opaque `u64` handles; functions take/return JSON
+C strings (`ope_string_free`), `null` on error (`ope_last_error_alloc` for the message).
+
+- `ope_e2e_engine_generate(engine_id, ed25519_public_b64)` → `{ handle, identity }` (real epoch keygen)
+- `ope_e2e_engine_decrypt_request(handle, envelope_json)` → payload JSON
+- `ope_e2e_engine_begin_response(handle, request_envelope_json)` → `{ session, server_share }`
+- `ope_e2e_response_encrypt_chunk(session, seq, plaintext_b64)` → `{ ciphertext }`
+- `ope_e2e_client_encrypt_request(engine_identity_json, payload_json, base_envelope_json, want_response_session)` → `{ envelope, client_session }`
+- `ope_e2e_client_decrypt_response_chunk(client_session, request_envelope_json, server_share_b64, seq, ciphertext_b64)` → `{ plaintext_b64 }`
+- `ope_e2e_engine_free` / `ope_e2e_response_free` / `ope_e2e_client_session_free`
+
+Attestation (TDX/SEV/GPU) APIs are not exposed in FFI yet; use the Rust crate `ope-attest`.
 
 ## Publishing
 

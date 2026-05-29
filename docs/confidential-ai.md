@@ -123,7 +123,8 @@ AES-GCM is acceptable for **non-streaming** responses; **ChaCha20-Poly1305 strea
 | `ope-e2e` crate | Reference (dev mock engine keys) |
 | `enc=e2e-hybrid-pq` in `ope-envelope` | Structure + gateway opaque mode |
 | TEE attestation binding real engine keys | Planned |
-| FFI / binding wrappers for E2E | Planned |
+| FFI for E2E (`ope_e2e_*` hybrid request/response C ABI) | Done — see [`bindings/README.md`](../bindings/README.md) |
+| Higher-level binding wrappers (per language) | Partial (Node koffi wrapper in consumer; others planned) |
 | Published vectors `spec/vectors/confidential-ai/` | Planned |
 
 See [`docs/ROADMAP.md`](ROADMAP.md) for phases.

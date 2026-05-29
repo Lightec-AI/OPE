@@ -20,7 +20,8 @@ Aligned with **Confidential AI** (client → TDX/SEV gateway → TDX/SEV+GPU inf
 | `enc=e2e-hybrid-pq`, `engine_id`, `e2e` on envelope | Done |
 | Gateway opaque verify (`opaque_e2e`) | Done |
 | `ope e2e-test` CLI | Done |
-| E2E interop vectors + FFI | Not started |
+| E2E FFI (`ope_e2e_*` hybrid request/response C ABI) | Done |
+| E2E interop vectors | Not started |
 | Real TEE engine key provisioning | Not started |
 | GPU TEE attestation binding | Not started |
 
@@ -36,8 +37,9 @@ Aligned with **Confidential AI** (client → TDX/SEV gateway → TDX/SEV+GPU inf
 | Item | Status |
 |------|--------|
 | C / Python / Go / TS envelope sign/verify | Done |
-| E2E encrypt/stream decrypt in FFI | Not started |
+| E2E encrypt/stream decrypt in FFI (`ope_e2e_*`, handle-based) | Done |
 | Published packages | Not started |
+| Browser/WASM binding | Not started |
 
 ## P3 — Gateway + attestation ✅ (mock)
 
@@ -56,5 +58,5 @@ Aligned with **Confidential AI** (client → TDX/SEV gateway → TDX/SEV+GPU inf
 ## How to contribute
 
 1. **E2E vectors:** Add `spec/vectors/confidential-ai/009-*.json` + `gen-vectors` support.
-2. **FFI:** Expose `ope_e2e_encrypt_request` / `ope_e2e_decrypt_stream_chunk`.
+2. **FFI:** ✅ hybrid E2E exposed via `ope_e2e_*` (handle-based; see [`bindings/README.md`](../bindings/README.md)). Next: WASM binding for browsers.
 3. **TEE:** Wire `EngineIdentity` to real attestation quotes (TDX/SEV/nvtrust).
