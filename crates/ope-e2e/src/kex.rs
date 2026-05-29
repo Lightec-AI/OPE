@@ -1,6 +1,7 @@
 //! Hybrid shared secrets for request (static engine) and response (ephemeral) directions.
 
 use kem::Encapsulate;
+use ml_kem::ml_kem_768::Ciphertext;
 use ope_transport::{
     client_shared_secret, combine_shared_secrets, ClientKeyExchange, ServerKeyExchange,
     X25519_SHARE_LEN,
@@ -22,17 +23,16 @@ pub fn client_request_shared_secret(
 ) -> Result<([u8; 64], Vec<u8>), Error> {
     let encap_bytes = engine.mlkem_encap_bytes()?;
     let encap_key = parse_mlkem_encapsulation_key(&encap_bytes)?;
-    let (ciphertext, mlkem_ss) = encap_key
-        .encapsulate(&mut OsRng)
-        .map_err(|e| Error::Transport(ope_transport::Error::MlKem(format!("{e:?}"))))?;
+    let (ciphertext, mlkem_ss): (Ciphertext, _) = encap_key.encapsulate();
 
     let engine_x25519 = engine.x25519_public_bytes()?;
     let secret = StaticSecret::from(client_x25519_secret);
     let peer = X25519Public::from(engine_x25519);
     let x25519_ss = secret.diffie_hellman(&peer);
 
-    let shared = combine_shared_secrets(mlkem_ss.as_slice(), x25519_ss.as_bytes());
-    Ok((shared, ciphertext.as_slice().to_vec()))
+    let shared = combine_shared_secrets(mlkem_ss.as_ref(), x25519_ss.as_bytes());
+    let ct_vec: Vec<u8> = ciphertext.iter().copied().collect();
+    Ok((shared, ct_vec))
 }
 
 /// Engine → client ephemeral (streaming response).

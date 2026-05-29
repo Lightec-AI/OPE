@@ -10,7 +10,7 @@ rust-version.workspace = true
 hex = { workspace = true }
 hkdf = { workspace = true }
 sha2 = { workspace = true }
-kem = "0.3.0-pre.0"
+kem = { workspace = true }
 ml-kem = { workspace = true }
 ope-crypto = { workspace = true }
 rand = { workspace = true }

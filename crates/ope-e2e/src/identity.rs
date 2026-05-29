@@ -1,7 +1,7 @@
 //! Engine and client hybrid identity material.
 
-use kem::Encapsulate;
-use ml_kem::{array::Array, Encoded, EncodedSizeUser, KemCore, MlKem768};
+use kem::{Decapsulate, KeyExport};
+use ml_kem::{array::Array, ml_kem_768::{Ciphertext, EncapsulationKey}};
 use ope_crypto::{encode, PublicKey};
 use ope_transport::{
     parse_decapsulation_key, ClientKeyExchange, MLKEM768_ENCAPSULATION_KEY_LEN, X25519_SHARE_LEN,
@@ -71,12 +71,12 @@ impl EngineStaticSecret {
     pub fn public_identity(&self) -> Result<EngineIdentity, crate::Error> {
         let decaps = parse_decapsulation_key(&self.mlkem_decaps_bytes)?;
         let encap = decaps.encapsulation_key();
-        let encap_bytes = encap.as_bytes();
+        let encap_bytes = encap.to_bytes();
         let x25519_public = X25519Public::from(&self.x25519_secret);
         Ok(EngineIdentity {
             engine_id: self.engine_id.clone(),
             kex: EngineIdentity::KEX_X25519_MLKEM768.into(),
-            mlkem_encapsulation_key: encode(encap_bytes.as_slice()),
+            mlkem_encapsulation_key: encode(encap_bytes.as_ref()),
             x25519_public: encode(x25519_public.as_bytes()),
             ed25519_public: encode(self.ed25519_public.as_bytes()),
         })
@@ -88,22 +88,18 @@ impl EngineStaticSecret {
         mlkem_ciphertext: &[u8],
         client_x25519_public: [u8; X25519_SHARE_LEN],
     ) -> Result<[u8; 64], crate::Error> {
-        use kem::Decapsulate;
-        use ml_kem::{array::Array, Ciphertext, EncodedSizeUser};
-        use ope_transport::MLKEM768_CIPHERTEXT_LEN;
         use ope_transport::combine_shared_secrets;
+        use ope_transport::MLKEM768_CIPHERTEXT_LEN;
 
         if mlkem_ciphertext.len() != MLKEM768_CIPHERTEXT_LEN {
             return Err(crate::Error::E2e("mlkem ciphertext length".into()));
         }
         let decaps = parse_decapsulation_key(&self.mlkem_decaps_bytes)?;
-        let ct: Ciphertext<MlKem768> = Array::clone_from_slice(mlkem_ciphertext);
-        let mlkem_ss = decaps
-            .decapsulate(&ct)
-            .map_err(|e| crate::Error::Transport(ope_transport::Error::MlKem(format!("{e:?}"))))?;
+        let ct: Ciphertext = Array::clone_from_slice(mlkem_ciphertext);
+        let mlkem_ss = decaps.decapsulate(&ct);
         let peer = X25519Public::from(client_x25519_public);
         let x25519_ss = self.x25519_secret.diffie_hellman(&peer);
-        Ok(combine_shared_secrets(mlkem_ss.as_slice(), x25519_ss.as_bytes()))
+        Ok(combine_shared_secrets(mlkem_ss.as_ref(), x25519_ss.as_bytes()))
     }
 
     /// Hybrid server step for streaming **response** to client ephemeral session.
@@ -133,10 +129,6 @@ impl ClientSession {
 }
 
 /// Encapsulation key parse for client → static engine request path.
-pub fn parse_mlkem_encapsulation_key(bytes: &[u8]) -> Result<<MlKem768 as KemCore>::EncapsulationKey, crate::Error> {
-    if bytes.len() != MLKEM768_ENCAPSULATION_KEY_LEN {
-        return Err(crate::Error::E2e("mlkem encap key length".into()));
-    }
-    let encoded: Encoded<<MlKem768 as KemCore>::EncapsulationKey> = Array::clone_from_slice(bytes);
-    Ok(<MlKem768 as KemCore>::EncapsulationKey::from_bytes(&encoded))
+pub fn parse_mlkem_encapsulation_key(bytes: &[u8]) -> Result<EncapsulationKey, crate::Error> {
+    ope_transport::parse_encapsulation_key(bytes).map_err(crate::Error::Transport)
 }

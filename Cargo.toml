@@ -19,13 +19,14 @@ version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/ClawBay/OPE"
-rust-version = "1.75"
+rust-version = "1.85"
 
 [workspace.dependencies]
+kem = { version = "0.3.0", features = ["getrandom"] }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 ed25519-dalek = { version = "2", features = ["rand_core"] }
-ml-kem = "0.2"
+ml-kem = { version = "0.3", features = ["getrandom"] }
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

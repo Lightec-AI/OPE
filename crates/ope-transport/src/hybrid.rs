@@ -1,5 +1,9 @@
-use kem::{Decapsulate, Encapsulate};
-use ml_kem::{array::Array, Ciphertext, Encoded, EncodedSizeUser, KemCore, MlKem768};
+use kem::{Decapsulate, Encapsulate, Kem, KeyExport, TryKeyInit};
+use ml_kem::{
+    array::Array,
+    ml_kem_768::{Ciphertext, DecapsulationKey, EncapsulationKey},
+    ExpandedDecapsulationKey, MlKem768,
+};
 use rand::rngs::OsRng;
 use x25519_dalek::{PublicKey as X25519Public, StaticSecret};
 
@@ -10,8 +14,9 @@ use crate::sizes::{
     X25519MLKEM768_SHARED_SECRET_LEN, X25519_SHARE_LEN,
 };
 
-type DecapsKey = <MlKem768 as KemCore>::DecapsulationKey;
-type EncapsKey = <MlKem768 as KemCore>::EncapsulationKey;
+type DecapsKey = DecapsulationKey;
+type EncapsKey = EncapsulationKey;
+
 /// Client `key_exchange` share: `ML-KEM encapsulation key || X25519 ephemeral public`.
 pub struct ClientKeyExchange {
     pub bytes: Vec<u8>,
@@ -22,14 +27,14 @@ pub struct ClientKeyExchange {
 impl ClientKeyExchange {
     /// Generate a fresh client share (ephemeral).
     pub fn generate() -> Result<Self, Error> {
-        let (decaps_secret, encap_key) = MlKem768::generate(&mut OsRng);
+        let (decaps_secret, encap_key) = MlKem768::generate_keypair();
         let x25519_secret = StaticSecret::random_from_rng(OsRng);
         let x25519_public = X25519Public::from(&x25519_secret);
         let x25519_private = x25519_secret.to_bytes();
 
-        let encap_bytes = encap_key.as_bytes();
+        let encap_bytes = encap_key.to_bytes();
         let mut bytes = Vec::with_capacity(X25519MLKEM768_CLIENT_SHARE_LEN);
-        bytes.extend_from_slice(encap_bytes.as_slice());
+        bytes.extend_from_slice(encap_bytes.as_ref());
         bytes.extend_from_slice(x25519_public.as_bytes());
 
         if bytes.len() != X25519MLKEM768_CLIENT_SHARE_LEN {
@@ -66,9 +71,7 @@ impl ServerKeyExchange {
                 actual: client.bytes.len() - MLKEM768_ENCAPSULATION_KEY_LEN,
             })?;
 
-        let (ciphertext, mlkem_ss) = encap_key
-            .encapsulate(&mut OsRng)
-            .map_err(|e| Error::MlKem(format!("encapsulate: {e:?}")))?;
+        let (ciphertext, mlkem_ss) = encap_key.encapsulate();
 
         let server_x25519_secret = StaticSecret::random_from_rng(OsRng);
         let server_x25519_public = X25519Public::from(&server_x25519_secret);
@@ -76,10 +79,10 @@ impl ServerKeyExchange {
         let x25519_ss = server_x25519_secret.diffie_hellman(&client_x25519_public);
 
         let mut bytes = Vec::with_capacity(X25519MLKEM768_SERVER_SHARE_LEN);
-        bytes.extend_from_slice(ciphertext.as_slice());
+        bytes.extend_from_slice(ciphertext.as_ref());
         bytes.extend_from_slice(server_x25519_public.as_bytes());
 
-        let shared = combine_shared_secrets(mlkem_ss.as_slice(), x25519_ss.as_bytes());
+        let shared = combine_shared_secrets(mlkem_ss.as_ref(), x25519_ss.as_bytes());
         Ok((Self { bytes }, shared))
     }
 }
@@ -104,30 +107,28 @@ pub fn client_shared_secret(
             actual: server.bytes.len() - MLKEM768_CIPHERTEXT_LEN,
         })?;
 
-    let mlkem_ss = client
-        .decaps_secret
-        .decapsulate(&ciphertext)
-        .map_err(|e| Error::MlKem(format!("decapsulate: {e:?}")))?;
+    let mlkem_ss = client.decaps_secret.decapsulate(&ciphertext);
 
     let server_x25519_public = X25519Public::from(server_x25519_bytes);
     let x25519_ss =
         StaticSecret::from(client.x25519_private).diffie_hellman(&server_x25519_public);
 
     Ok(combine_shared_secrets(
-        mlkem_ss.as_slice(),
+        mlkem_ss.as_ref(),
         x25519_ss.as_bytes(),
     ))
 }
 
-fn parse_encapsulation_key(bytes: &[u8]) -> Result<EncapsKey, Error> {
+/// Parse a wire-format ML-KEM-768 encapsulation key (1184 bytes).
+pub fn parse_encapsulation_key(bytes: &[u8]) -> Result<EncapsKey, Error> {
     if bytes.len() != MLKEM768_ENCAPSULATION_KEY_LEN {
         return Err(Error::InvalidShareLength {
             expected: MLKEM768_ENCAPSULATION_KEY_LEN,
             actual: bytes.len(),
         });
     }
-    let encoded: Encoded<EncapsKey> = Array::clone_from_slice(bytes);
-    Ok(EncapsKey::from_bytes(&encoded))
+    let key = Array::clone_from_slice(bytes);
+    EncapsKey::new(&key).map_err(|_| Error::MlKem("invalid encapsulation key".into()))
 }
 
 /// Parse a BoringSSL / NIST-encoded ML-KEM-768 decapsulation key (2400 bytes).
@@ -139,8 +140,11 @@ pub fn parse_decapsulation_key(bytes: &[u8]) -> Result<DecapsKey, Error> {
             actual: bytes.len(),
         });
     }
-    let encoded: Encoded<DecapsKey> = Array::clone_from_slice(bytes);
-    Ok(DecapsKey::from_bytes(&encoded))
+    let expanded: ExpandedDecapsulationKey<MlKem768> = Array::clone_from_slice(bytes);
+    #[allow(deprecated)]
+    let dk = DecapsKey::from_expanded(&expanded)
+        .map_err(|_| Error::MlKem("invalid decapsulation key".into()))?;
+    Ok(dk)
 }
 
 /// Decapsulate ML-KEM-768 ciphertext with a decapsulation key (BoringSSL ACVP vectors).
@@ -149,11 +153,9 @@ pub fn mlkem_decapsulate(
     ciphertext: &[u8],
 ) -> Result<[u8; MLKEM768_SHARED_SECRET_LEN], Error> {
     let ct = parse_ciphertext(ciphertext)?;
-    let ss = decaps_secret
-        .decapsulate(&ct)
-        .map_err(|e| Error::MlKem(format!("decapsulate: {e:?}")))?;
+    let ss = decaps_secret.decapsulate(&ct);
     let mut out = [0u8; MLKEM768_SHARED_SECRET_LEN];
-    out.copy_from_slice(ss.as_slice());
+    out.copy_from_slice(ss.as_ref());
     Ok(out)
 }
 
@@ -201,7 +203,7 @@ impl ServerKeyExchange {
     }
 }
 
-fn parse_ciphertext(bytes: &[u8]) -> Result<Ciphertext<MlKem768>, Error> {
+fn parse_ciphertext(bytes: &[u8]) -> Result<Ciphertext, Error> {
     if bytes.len() != MLKEM768_CIPHERTEXT_LEN {
         return Err(Error::InvalidShareLength {
             expected: MLKEM768_CIPHERTEXT_LEN,
