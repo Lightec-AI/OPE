@@ -1,0 +1,20 @@
+[package]
+name = "ope-wasm"
+description = "WASM bindings for OPE client-side hybrid E2E (browser / Capacitor WebView)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+getrandom = { version = "0.4", features = ["wasm_js"] }
+# `rand` pulls getrandom 0.2; enable the `js` backend for wasm32-unknown-unknown.
+getrandom02 = { package = "getrandom", version = "0.2", features = ["js"] }
+ope-crypto = { workspace = true }
+ope-e2e = { workspace = true }
+ope-envelope = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = "0.2"

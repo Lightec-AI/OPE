@@ -10,6 +10,7 @@ members = [
     "crates/ope-gateway",
     "crates/ope-server",
     "crates/ope-ffi",
+    "crates/ope-wasm",
     "crates/ope-cli",
     "sdks/conversation",
 ]
