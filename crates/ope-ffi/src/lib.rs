@@ -11,7 +11,7 @@ pub use error::{
 
 pub use envelope::{
     ope_envelope_sign, ope_envelope_sign_alloc, ope_envelope_verify,
-    ope_envelope_verify_dev_json,
+    ope_envelope_verify_dev_json, ope_envelope_verify_gateway_opaque,
 };
 
 pub use e2e::{

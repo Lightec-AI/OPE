@@ -130,6 +130,56 @@ pub unsafe extern "C" fn ope_envelope_verify(
     }
 }
 
+/// Gateway opaque mode: verify signature, timestamp, recipient; `enc=e2e-hybrid-pq` without decrypt.
+/// `expected_recipient` may be null to skip recipient binding.
+#[no_mangle]
+pub unsafe extern "C" fn ope_envelope_verify_gateway_opaque(
+    public_key: *const u8,
+    json: *const c_char,
+    expected_recipient: *const c_char,
+    max_skew_secs: u32,
+) -> i32 {
+    let pk_bytes = match key32(public_key, "public_key") {
+        Ok(b) => b,
+        Err(c) => return c,
+    };
+    let envelope = match parse_envelope_json(json) {
+        Ok(e) => e,
+        Err(c) => return c,
+    };
+    let public = match public_key_from_bytes(&pk_bytes) {
+        Ok(p) => p,
+        Err(_) => return set_last_error_code(OPE_ERR_CRYPTO, "invalid public key"),
+    };
+    let max_skew = if max_skew_secs == 0 {
+        300
+    } else {
+        max_skew_secs
+    };
+    let expected_recipient = if expected_recipient.is_null() {
+        None
+    } else {
+        match CStr::from_ptr(expected_recipient).to_str() {
+            Ok(s) => Some(s.to_string()),
+            Err(e) => {
+                return set_last_error_code(OPE_ERR_UTF8, format!("invalid recipient utf-8: {e}"))
+            }
+        }
+    };
+    let options = VerifyOptions {
+        max_skew: Duration::from_secs(max_skew as u64),
+        seen_nonces: None,
+        expected_recipient,
+        content_key: None,
+        require_routed_model: false,
+        opaque_e2e: true,
+    };
+    match verify_envelope(&envelope, &public, &options) {
+        Ok(()) => OPE_OK,
+        Err(e) => set_last_error_code(OPE_ERR_VERIFY, format!("verify failed: {e}")),
+    }
+}
+
 /// Verify using the dev vector-001 mock public key (CI/dev only).
 #[no_mangle]
 pub unsafe extern "C" fn ope_envelope_verify_dev_json(json: *const c_char) -> i32 {
