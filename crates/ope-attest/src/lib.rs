@@ -3,6 +3,8 @@
 mod canonical;
 mod error;
 mod mock;
+mod policy;
+mod quote;
 mod sign;
 mod types;
 mod verify;
@@ -14,4 +16,6 @@ pub use types::{
     Attestation, CreateAttestationRequest, CreateAttestationResponse, VerificationCheck,
     VerificationError, VerificationVerdict, VerifyEnvelopeRequest,
 };
+pub use policy::{AttestationPolicySchema, MeasurementAllowlist};
+pub use quote::{CpuQuoteInput, CpuQuoteVerifier, FixtureQuoteVerifier, QuoteVerifyResult};
 pub use verify::verify_attestation;
