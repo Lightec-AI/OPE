@@ -1,7 +1,7 @@
 //! Deterministic dev engine keys (CI only).
 
 use kem::FromSeed;
-use ml_kem::{array::Array, ExpandedDecapsulationKey, ExpandedKeyEncoding, MlKem768, Seed};
+use ml_kem::{array::Array, MlKem768, Seed};
 use ope_crypto::mock_keypair_from_seed;
 
 use crate::identity::{EngineIdentity, EngineStaticSecret};
@@ -14,11 +14,10 @@ pub fn mock_engine_from_seed(seed: &[u8; 32]) -> (EngineStaticSecret, EngineIden
     let mut seed_arr = [0u8; 64];
     seed_arr[..32].copy_from_slice(seed);
     seed_arr[32..].copy_from_slice(seed);
-    let kem_seed: Seed = Array::clone_from_slice(&seed_arr);
+    let kem_seed: Seed = Array::try_from(seed_arr.as_slice()).expect("mock kem seed length");
     let (decaps, _encaps) = MlKem768::from_seed(&kem_seed);
-    #[allow(deprecated)]
-    let expanded: ExpandedDecapsulationKey<MlKem768> = decaps.to_expanded_bytes();
-    let decaps_bytes: Vec<u8> = expanded.iter().copied().collect();
+    let mlkem_seed = decaps.to_seed().expect("mock mlkem key has seed");
+    let decaps_bytes: Vec<u8> = mlkem_seed.iter().copied().collect();
     let x25519_secret = {
         let mut s = [0u8; 32];
         for (i, b) in s.iter_mut().enumerate() {

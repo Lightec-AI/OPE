@@ -4,12 +4,12 @@ use kem::{Decapsulate, Kem, KeyExport};
 use ml_kem::{
     array::Array,
     ml_kem_768::{Ciphertext, EncapsulationKey},
-    ExpandedDecapsulationKey, ExpandedKeyEncoding, MlKem768,
+    MlKem768,
 };
 use ope_crypto::{encode, PublicKey};
 use rand::rngs::OsRng;
 use ope_transport::{
-    parse_decapsulation_key, ClientKeyExchange, MLKEM768_ENCAPSULATION_KEY_LEN, X25519_SHARE_LEN,
+    load_decapsulation_key, ClientKeyExchange, MLKEM768_ENCAPSULATION_KEY_LEN, X25519_SHARE_LEN,
 };
 use serde::{Deserialize, Serialize};
 use x25519_dalek::{PublicKey as X25519Public, StaticSecret};
@@ -57,14 +57,14 @@ pub struct EngineStaticSecret {
 }
 
 impl EngineStaticSecret {
-    /// Build from ML-KEM decapsulation key bytes (2400) + X25519 secret + Ed25519 public.
+    /// Build from ML-KEM decapsulation seed (64) or expanded key (2400) + X25519 secret + Ed25519 public.
     pub fn from_bytes(
         engine_id: impl Into<String>,
         mlkem_decaps: &[u8],
         x25519_secret: [u8; X25519_SHARE_LEN],
         ed25519_public: PublicKey,
     ) -> Result<Self, crate::Error> {
-        parse_decapsulation_key(mlkem_decaps)?;
+        load_decapsulation_key(mlkem_decaps)?;
         Ok(Self {
             engine_id: engine_id.into(),
             mlkem_decaps_bytes: mlkem_decaps.to_vec(),
@@ -84,9 +84,10 @@ impl EngineStaticSecret {
         ed25519_public: PublicKey,
     ) -> Result<(Self, EngineIdentity), crate::Error> {
         let (decaps, _encaps) = MlKem768::generate_keypair();
-        #[allow(deprecated)]
-        let expanded: ExpandedDecapsulationKey<MlKem768> = decaps.to_expanded_bytes();
-        let mlkem_decaps: Vec<u8> = expanded.iter().copied().collect();
+        let seed = decaps
+            .to_seed()
+            .ok_or_else(|| crate::Error::E2e("generated mlkem key missing seed".into()))?;
+        let mlkem_decaps: Vec<u8> = seed.iter().copied().collect();
 
         let x25519_secret = StaticSecret::random_from_rng(OsRng);
         let x25519_bytes = x25519_secret.to_bytes();
@@ -97,7 +98,7 @@ impl EngineStaticSecret {
     }
 
     pub fn public_identity(&self) -> Result<EngineIdentity, crate::Error> {
-        let decaps = parse_decapsulation_key(&self.mlkem_decaps_bytes)?;
+        let decaps = load_decapsulation_key(&self.mlkem_decaps_bytes)?;
         let encap = decaps.encapsulation_key();
         let encap_bytes = encap.to_bytes();
         let x25519_public = X25519Public::from(&self.x25519_secret);
@@ -122,8 +123,9 @@ impl EngineStaticSecret {
         if mlkem_ciphertext.len() != MLKEM768_CIPHERTEXT_LEN {
             return Err(crate::Error::E2e("mlkem ciphertext length".into()));
         }
-        let decaps = parse_decapsulation_key(&self.mlkem_decaps_bytes)?;
-        let ct: Ciphertext = Array::clone_from_slice(mlkem_ciphertext);
+        let decaps = load_decapsulation_key(&self.mlkem_decaps_bytes)?;
+        let ct: Ciphertext = Array::try_from(mlkem_ciphertext)
+            .map_err(|_| crate::Error::E2e("mlkem ciphertext length".into()))?;
         let mlkem_ss = decaps.decapsulate(&ct);
         let peer = X25519Public::from(client_x25519_public);
         let x25519_ss = self.x25519_secret.diffie_hellman(&peer);

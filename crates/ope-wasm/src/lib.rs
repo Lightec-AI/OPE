@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use ope_crypto::{decode, encode};
+use ope_crypto::encode;
 use ope_e2e::{decrypt_response_chunk, encrypt_request, ClientSession, EngineIdentity};
 use ope_envelope::Envelope;
 use serde_json::{json, Value};

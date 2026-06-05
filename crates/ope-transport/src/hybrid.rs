@@ -1,8 +1,8 @@
-use kem::{Decapsulate, Encapsulate, Kem, KeyExport, TryKeyInit};
+use kem::{Decapsulate, Encapsulate, Kem, KeyExport};
 use ml_kem::{
     array::Array,
     ml_kem_768::{Ciphertext, DecapsulationKey, EncapsulationKey},
-    ExpandedDecapsulationKey, MlKem768,
+    ExpandedDecapsulationKey, MlKem768, Seed,
 };
 use rand::rngs::OsRng;
 use x25519_dalek::{PublicKey as X25519Public, StaticSecret};
@@ -144,8 +144,26 @@ pub fn parse_encapsulation_key(bytes: &[u8]) -> Result<EncapsKey, Error> {
             actual: bytes.len(),
         });
     }
-    let key = Array::clone_from_slice(bytes);
+    let key = Array::try_from(bytes).map_err(|_| Error::InvalidShareLength {
+        expected: MLKEM768_ENCAPSULATION_KEY_LEN,
+        actual: bytes.len(),
+    })?;
     EncapsKey::new(&key).map_err(|_| Error::MlKem("invalid encapsulation key".into()))
+}
+
+/// ML-KEM-768 decapsulation key seed length (preferred in-memory form).
+pub const MLKEM768_SEED_LEN: usize = 64;
+
+/// Load a decapsulation key from a 64-byte seed or 2400-byte expanded wire encoding.
+pub fn load_decapsulation_key(bytes: &[u8]) -> Result<DecapsKey, Error> {
+    if bytes.len() == MLKEM768_SEED_LEN {
+        let seed: Seed = Array::try_from(bytes).map_err(|_| Error::InvalidShareLength {
+            expected: MLKEM768_SEED_LEN,
+            actual: bytes.len(),
+        })?;
+        return Ok(DecapsKey::from_seed(seed));
+    }
+    parse_decapsulation_key(bytes)
 }
 
 /// Parse a BoringSSL / NIST-encoded ML-KEM-768 decapsulation key (2400 bytes).
@@ -157,7 +175,12 @@ pub fn parse_decapsulation_key(bytes: &[u8]) -> Result<DecapsKey, Error> {
             actual: bytes.len(),
         });
     }
-    let expanded: ExpandedDecapsulationKey<MlKem768> = Array::clone_from_slice(bytes);
+    let expanded: ExpandedDecapsulationKey<MlKem768> = Array::try_from(bytes).map_err(|_| {
+        Error::InvalidShareLength {
+            expected: DECAPS_LEN,
+            actual: bytes.len(),
+        }
+    })?;
     #[allow(deprecated)]
     let dk = DecapsKey::from_expanded(&expanded)
         .map_err(|_| Error::MlKem("invalid decapsulation key".into()))?;
@@ -227,7 +250,10 @@ fn parse_ciphertext(bytes: &[u8]) -> Result<Ciphertext, Error> {
             actual: bytes.len(),
         });
     }
-    Ok(Array::clone_from_slice(bytes))
+    Array::try_from(bytes).map_err(|_| Error::InvalidShareLength {
+        expected: MLKEM768_CIPHERTEXT_LEN,
+        actual: bytes.len(),
+    })
 }
 
 /// Concatenate per draft-ietf-tls-ecdhe-mlkem: `ML-KEM_ss || X25519_ss`.
@@ -252,5 +278,26 @@ mod tests {
         let client_ss = client_shared_secret(&client, &server).unwrap();
         assert_eq!(client_ss, server_ss);
         assert_eq!(client_ss.len(), X25519MLKEM768_SHARED_SECRET_LEN);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn load_decapsulation_key_accepts_seed_and_expanded() {
+        use ml_kem::ExpandedKeyEncoding;
+
+        let (decaps, _encaps) = MlKem768::generate_keypair();
+        let seed = decaps.to_seed().expect("generated key has seed");
+        let seed_bytes: Vec<u8> = seed.iter().copied().collect();
+        let from_seed = load_decapsulation_key(&seed_bytes).expect("seed load");
+        let expanded_err = parse_decapsulation_key(&seed_bytes).expect_err("seed is not expanded");
+        assert!(matches!(expanded_err, Error::InvalidShareLength { .. }));
+
+        #[allow(deprecated)]
+        let expanded_bytes: Vec<u8> = decaps.to_expanded_bytes().iter().copied().collect();
+        let from_expanded = load_decapsulation_key(&expanded_bytes).expect("expanded load");
+        assert_eq!(
+            from_seed.encapsulation_key().to_bytes(),
+            from_expanded.encapsulation_key().to_bytes()
+        );
     }
 }

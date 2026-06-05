@@ -10,9 +10,8 @@ pub use error::Error;
 pub use hkdf::{derive_record_keys, HkdfError, RecordKeys};
 pub use hybrid::{
     client_from_test_material, client_shared_secret, combine_shared_secrets,
-    mlkem_decapsulate, parse_decapsulation_key, parse_encapsulation_key, x25519_shared_secret,
-    ClientKeyExchange,
-    ServerKeyExchange,
+    load_decapsulation_key, mlkem_decapsulate, parse_decapsulation_key, parse_encapsulation_key,
+    x25519_shared_secret, ClientKeyExchange, ServerKeyExchange, MLKEM768_SEED_LEN,
 };
 pub use sizes::{
     GROUP_X25519_MLKEM768, MLKEM768_CIPHERTEXT_LEN, MLKEM768_ENCAPSULATION_KEY_LEN,
