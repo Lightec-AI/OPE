@@ -11,11 +11,11 @@ mod verify;
 
 pub use error::Error;
 pub use mock::{allow_verdict, checks_from_results, deny_verdict, MockAttester};
+pub use policy::{AttestationPolicySchema, MeasurementAllowlist};
+pub use quote::{CpuQuoteInput, CpuQuoteVerifier, FixtureQuoteVerifier, QuoteVerifyResult};
 pub use sign::{issue_attestation, sign_attestation};
 pub use types::{
     Attestation, CreateAttestationRequest, CreateAttestationResponse, VerificationCheck,
     VerificationError, VerificationVerdict, VerifyEnvelopeRequest,
 };
-pub use policy::{AttestationPolicySchema, MeasurementAllowlist};
-pub use quote::{CpuQuoteInput, CpuQuoteVerifier, FixtureQuoteVerifier, QuoteVerifyResult};
 pub use verify::verify_attestation;

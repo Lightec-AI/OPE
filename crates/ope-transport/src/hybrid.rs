@@ -127,8 +127,7 @@ pub fn client_shared_secret(
     let mlkem_ss = client.decaps_secret.decapsulate(&ciphertext);
 
     let server_x25519_public = X25519Public::from(server_x25519_bytes);
-    let x25519_ss =
-        StaticSecret::from(client.x25519_private).diffie_hellman(&server_x25519_public);
+    let x25519_ss = StaticSecret::from(client.x25519_private).diffie_hellman(&server_x25519_public);
 
     Ok(combine_shared_secrets(
         mlkem_ss.as_ref(),
@@ -175,12 +174,11 @@ pub fn parse_decapsulation_key(bytes: &[u8]) -> Result<DecapsKey, Error> {
             actual: bytes.len(),
         });
     }
-    let expanded: ExpandedDecapsulationKey<MlKem768> = Array::try_from(bytes).map_err(|_| {
-        Error::InvalidShareLength {
+    let expanded: ExpandedDecapsulationKey<MlKem768> =
+        Array::try_from(bytes).map_err(|_| Error::InvalidShareLength {
             expected: DECAPS_LEN,
             actual: bytes.len(),
-        }
-    })?;
+        })?;
     #[allow(deprecated)]
     let dk = DecapsKey::from_expanded(&expanded)
         .map_err(|_| Error::MlKem("invalid decapsulation key".into()))?;

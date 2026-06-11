@@ -8,10 +8,9 @@ use ope_transport::vectors::{
 };
 use ope_transport::{
     client_from_test_material, client_shared_secret, combine_shared_secrets, mlkem_decapsulate,
-    x25519_shared_secret, ServerKeyExchange, GROUP_X25519_MLKEM768,
-    MLKEM768_CIPHERTEXT_LEN, MLKEM768_ENCAPSULATION_KEY_LEN,
-    X25519MLKEM768_CLIENT_SHARE_LEN, X25519MLKEM768_SERVER_SHARE_LEN,
-    X25519MLKEM768_SHARED_SECRET_LEN, X25519_SHARE_LEN,
+    x25519_shared_secret, ServerKeyExchange, GROUP_X25519_MLKEM768, MLKEM768_CIPHERTEXT_LEN,
+    MLKEM768_ENCAPSULATION_KEY_LEN, X25519MLKEM768_CLIENT_SHARE_LEN,
+    X25519MLKEM768_SERVER_SHARE_LEN, X25519MLKEM768_SHARED_SECRET_LEN, X25519_SHARE_LEN,
 };
 
 fn transport_vectors_dir() -> PathBuf {
@@ -94,8 +93,7 @@ fn hybrid_x25519mlkem768_composed_vector_000() {
     let server = ServerKeyExchange::from_bytes(&server_share).unwrap();
     let computed = client_shared_secret(&client, &server).unwrap();
 
-    let expected =
-        decode_hex("hybrid_shared_secret_hex", &h.hybrid_shared_secret_hex).unwrap();
+    let expected = decode_hex("hybrid_shared_secret_hex", &h.hybrid_shared_secret_hex).unwrap();
     assert_eq!(expected.len(), X25519MLKEM768_SHARED_SECRET_LEN);
     assert_eq!(computed.as_slice(), expected.as_slice());
 
@@ -113,8 +111,17 @@ fn hybrid_share_layout_matches_draft() {
     let client = decode_hex("client_share_hex", &h.client_share_hex).unwrap();
     let server = decode_hex("server_share_hex", &h.server_share_hex).unwrap();
 
-    assert_eq!(&client[..MLKEM768_ENCAPSULATION_KEY_LEN].len(), &MLKEM768_ENCAPSULATION_KEY_LEN);
-    assert_eq!(client.len() - MLKEM768_ENCAPSULATION_KEY_LEN, X25519_SHARE_LEN);
-    assert_eq!(&server[..MLKEM768_CIPHERTEXT_LEN].len(), &MLKEM768_CIPHERTEXT_LEN);
+    assert_eq!(
+        &client[..MLKEM768_ENCAPSULATION_KEY_LEN].len(),
+        &MLKEM768_ENCAPSULATION_KEY_LEN
+    );
+    assert_eq!(
+        client.len() - MLKEM768_ENCAPSULATION_KEY_LEN,
+        X25519_SHARE_LEN
+    );
+    assert_eq!(
+        &server[..MLKEM768_CIPHERTEXT_LEN].len(),
+        &MLKEM768_CIPHERTEXT_LEN
+    );
     assert_eq!(server.len() - MLKEM768_CIPHERTEXT_LEN, X25519_SHARE_LEN);
 }

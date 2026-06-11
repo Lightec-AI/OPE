@@ -15,20 +15,18 @@ pub fn begin_response_session(
     engine: &EngineStaticSecret,
     request: &Envelope,
     client: &ClientSession,
-) -> Result<( [u8; 32], [u8; 12], ServerKeyExchange), Error> {
+) -> Result<([u8; 32], [u8; 12], ServerKeyExchange), Error> {
     let (shared, server) = engine.respond_to_client(&client.kex)?;
-    let key = derive_response_content_key(
-        &shared,
-        &engine.engine_id,
-        &request.kid,
-        &request.nonce,
-    )?;
+    let key =
+        derive_response_content_key(&shared, &engine.engine_id, &request.kid, &request.nonce)?;
     let iv_b64 = request
         .iv
         .as_ref()
         .ok_or_else(|| Error::E2e("request iv".into()))?;
     let iv_bytes = ope_crypto::decode(iv_b64).map_err(|_| Error::E2e("iv".into()))?;
-    let iv: [u8; 12] = iv_bytes.try_into().map_err(|_| Error::E2e("iv len".into()))?;
+    let iv: [u8; 12] = iv_bytes
+        .try_into()
+        .map_err(|_| Error::E2e("iv len".into()))?;
     Ok((key, iv, server))
 }
 
@@ -42,16 +40,19 @@ pub fn begin_response_session_from_share(
     request: &Envelope,
     client_share_b64: &str,
 ) -> Result<([u8; 32], [u8; 12], ServerKeyExchange), Error> {
-    let share = ope_crypto::decode(client_share_b64)
-        .map_err(|_| Error::E2e("client_share".into()))?;
+    let share =
+        ope_crypto::decode(client_share_b64).map_err(|_| Error::E2e("client_share".into()))?;
     let (server, shared) = ServerKeyExchange::respond_to_share(&share)?;
-    let key = derive_response_content_key(&shared, &engine.engine_id, &request.kid, &request.nonce)?;
+    let key =
+        derive_response_content_key(&shared, &engine.engine_id, &request.kid, &request.nonce)?;
     let iv_b64 = request
         .iv
         .as_ref()
         .ok_or_else(|| Error::E2e("request iv".into()))?;
     let iv_bytes = ope_crypto::decode(iv_b64).map_err(|_| Error::E2e("iv".into()))?;
-    let iv: [u8; 12] = iv_bytes.try_into().map_err(|_| Error::E2e("iv len".into()))?;
+    let iv: [u8; 12] = iv_bytes
+        .try_into()
+        .map_err(|_| Error::E2e("iv len".into()))?;
     Ok((key, iv, server))
 }
 
@@ -73,18 +74,17 @@ pub fn decrypt_response_chunk(
     seq: u32,
     ciphertext_b64: &str,
 ) -> Result<Vec<u8>, Error> {
-    let server_bytes = ope_crypto::decode(server_share_b64)
-        .map_err(|_| Error::E2e("server_share".into()))?;
+    let server_bytes =
+        ope_crypto::decode(server_share_b64).map_err(|_| Error::E2e("server_share".into()))?;
     let server = ServerKeyExchange::from_bytes(&server_bytes)?;
     let shared = client_response_shared_secret(&client.kex, &server)?;
-    let engine_id = request
-        .engine_id
-        .as_deref()
-        .unwrap_or("engine-dev");
+    let engine_id = request.engine_id.as_deref().unwrap_or("engine-dev");
     let key = derive_response_content_key(&shared, engine_id, &request.kid, &request.nonce)?;
     let iv_b64 = request.iv.as_ref().ok_or_else(|| Error::E2e("iv".into()))?;
     let iv_bytes = ope_crypto::decode(iv_b64).map_err(|_| Error::E2e("iv".into()))?;
-    let iv: [u8; 12] = iv_bytes.try_into().map_err(|_| Error::E2e("iv len".into()))?;
+    let iv: [u8; 12] = iv_bytes
+        .try_into()
+        .map_err(|_| Error::E2e("iv len".into()))?;
     decrypt_chunk(&key, &iv, seq, ciphertext_b64)
 }
 

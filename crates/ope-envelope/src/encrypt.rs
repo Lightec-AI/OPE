@@ -1,4 +1,4 @@
-use ope_crypto::{decode, encrypt, encode, EncMode, AeadError};
+use ope_crypto::{decode, encode, encrypt, AeadError, EncMode};
 use rand::RngCore;
 use serde_json::Value;
 
@@ -7,10 +7,7 @@ use crate::envelope::Envelope;
 use crate::Error;
 
 /// Encrypt `payload` in place: sets `payload_hash`, `ciphertext`, `iv`, clears `payload`.
-pub fn encrypt_envelope(
-    envelope: &mut Envelope,
-    content_key: &[u8; 32],
-) -> Result<(), Error> {
+pub fn encrypt_envelope(envelope: &mut Envelope, content_key: &[u8; 32]) -> Result<(), Error> {
     let mode = EncMode::parse(&envelope.enc).map_err(|e| Error::Encryption(e.to_string()))?;
     let payload = envelope
         .payload
@@ -52,11 +49,6 @@ pub fn decrypt_envelope(envelope: &Envelope, content_key: &[u8; 32]) -> Result<V
     Ok(payload)
 }
 
-fn decrypt_payload(
-    mode: EncMode,
-    key: &[u8; 32],
-    iv: &[u8],
-    ct: &[u8],
-) -> Result<Vec<u8>, Error> {
+fn decrypt_payload(mode: EncMode, key: &[u8; 32], iv: &[u8], ct: &[u8]) -> Result<Vec<u8>, Error> {
     ope_crypto::decrypt(mode, key, iv, ct).map_err(|e: AeadError| Error::Decryption(e.to_string()))
 }

@@ -29,7 +29,12 @@ pub enum FramingError {
 /// Parse `Content-Type` for OPE-over-HTTP requests.
 pub fn parse_content_type(header: Option<&str>) -> Result<&'static str, FramingError> {
     let value = header.ok_or(FramingError::MissingContentType)?;
-    let mime = value.split(';').next().unwrap_or(value).trim().to_ascii_lowercase();
+    let mime = value
+        .split(';')
+        .next()
+        .unwrap_or(value)
+        .trim()
+        .to_ascii_lowercase();
     match mime.as_str() {
         "application/ope+json" => Ok(CONTENT_TYPE_OPE_JSON),
         "application/json" => Ok(CONTENT_TYPE_JSON),

@@ -30,7 +30,11 @@ pub struct FixtureQuoteVerifier {
 impl CpuQuoteVerifier for FixtureQuoteVerifier {
     fn verify_cpu_quote(&self, input: &CpuQuoteInput) -> Result<QuoteVerifyResult, Error> {
         if let Some(hex) = &self.expect_report_data_hex {
-            let rd = input.report_data.get("hex").and_then(|v| v.as_str()).unwrap_or("");
+            let rd = input
+                .report_data
+                .get("hex")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             if rd != hex {
                 return Ok(QuoteVerifyResult {
                     ok: false,

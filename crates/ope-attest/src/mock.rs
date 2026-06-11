@@ -36,7 +36,10 @@ impl MockAttester {
         mock_keypair_from_seed(&DEV_ATTESTER_SEED)
     }
 
-    pub fn create(&self, req: CreateAttestationRequest) -> Result<CreateAttestationResponse, Error> {
+    pub fn create(
+        &self,
+        req: CreateAttestationRequest,
+    ) -> Result<CreateAttestationResponse, Error> {
         {
             let mut cache = self.seen_nonces.lock().unwrap();
             if !cache.insert(req.nonce.clone()) {
@@ -90,7 +93,11 @@ pub fn checks_from_results(results: &[(&str, bool)]) -> Vec<VerificationCheck> {
         .collect()
 }
 
-pub fn deny_verdict(code: &str, message: &str, checks: Vec<VerificationCheck>) -> VerificationVerdict {
+pub fn deny_verdict(
+    code: &str,
+    message: &str,
+    checks: Vec<VerificationCheck>,
+) -> VerificationVerdict {
     VerificationVerdict {
         verified: false,
         decision: "deny".into(),
@@ -103,7 +110,10 @@ pub fn deny_verdict(code: &str, message: &str, checks: Vec<VerificationCheck>) -
     }
 }
 
-pub fn allow_verdict(checks: Vec<VerificationCheck>, normalized: serde_json::Value) -> VerificationVerdict {
+pub fn allow_verdict(
+    checks: Vec<VerificationCheck>,
+    normalized: serde_json::Value,
+) -> VerificationVerdict {
     VerificationVerdict {
         verified: true,
         decision: "allow".into(),

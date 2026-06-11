@@ -12,7 +12,7 @@ use axum::{
     Json, Router,
 };
 use ope_attest::{CreateAttestationRequest, CreateAttestationResponse, MockAttester};
-use ope_gateway::{GatewayConfig, GatewayError, verify_envelope_request};
+use ope_gateway::{verify_envelope_request, GatewayConfig, GatewayError};
 use ope_http::{parse_content_type, CONTENT_TYPE_JSON};
 
 #[derive(Clone)]
@@ -25,7 +25,10 @@ pub struct AppState {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/v1/ope/attestations", post(create_attestation))
-        .route("/v1/ope/verifications:verifyEnvelope", post(verify_envelope))
+        .route(
+            "/v1/ope/verifications:verifyEnvelope",
+            post(verify_envelope),
+        )
         .with_state(state)
 }
 
@@ -74,9 +77,7 @@ async fn verify_envelope(
 }
 
 fn ensure_json(headers: &HeaderMap) -> Result<(), ApiError> {
-    let ct = headers
-        .get("content-type")
-        .and_then(|v| v.to_str().ok());
+    let ct = headers.get("content-type").and_then(|v| v.to_str().ok());
     parse_content_type(ct).map_err(|e| {
         ApiError::status(
             StatusCode::BAD_REQUEST,
@@ -104,7 +105,11 @@ impl ApiError {
     }
 
     fn from_gateway(err: GatewayError) -> Self {
-        Self::status(StatusCode::BAD_REQUEST, "ope_verification_failed", &err.to_string())
+        Self::status(
+            StatusCode::BAD_REQUEST,
+            "ope_verification_failed",
+            &err.to_string(),
+        )
     }
 }
 

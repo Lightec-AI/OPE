@@ -44,7 +44,12 @@ impl EncMode {
     }
 }
 
-pub fn encrypt(mode: EncMode, key: &[u8; 32], iv: &[u8], plaintext: &[u8]) -> Result<Vec<u8>, AeadError> {
+pub fn encrypt(
+    mode: EncMode,
+    key: &[u8; 32],
+    iv: &[u8],
+    plaintext: &[u8],
+) -> Result<Vec<u8>, AeadError> {
     match mode {
         EncMode::A256Gcm => {
             if iv.len() != 12 {
@@ -52,22 +57,30 @@ pub fn encrypt(mode: EncMode, key: &[u8; 32], iv: &[u8], plaintext: &[u8]) -> Re
             }
             let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| AeadError::InvalidKey)?;
             let n = AesNonce::from_slice(iv);
-            cipher.encrypt(n, plaintext)
+            cipher
+                .encrypt(n, plaintext)
                 .map_err(|_| AeadError::EncryptFailed)
         }
         EncMode::XChaCha20Poly1305 => {
             if iv.len() != 24 {
                 return Err(AeadError::InvalidIv);
             }
-            let cipher = XChaCha20Poly1305::new_from_slice(key).map_err(|_| AeadError::InvalidKey)?;
+            let cipher =
+                XChaCha20Poly1305::new_from_slice(key).map_err(|_| AeadError::InvalidKey)?;
             let n = XNonce::from_slice(iv);
-            cipher.encrypt(n, plaintext)
+            cipher
+                .encrypt(n, plaintext)
                 .map_err(|_| AeadError::EncryptFailed)
         }
     }
 }
 
-pub fn decrypt(mode: EncMode, key: &[u8; 32], iv: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, AeadError> {
+pub fn decrypt(
+    mode: EncMode,
+    key: &[u8; 32],
+    iv: &[u8],
+    ciphertext: &[u8],
+) -> Result<Vec<u8>, AeadError> {
     match mode {
         EncMode::A256Gcm => {
             if iv.len() != 12 {
@@ -75,16 +88,19 @@ pub fn decrypt(mode: EncMode, key: &[u8; 32], iv: &[u8], ciphertext: &[u8]) -> R
             }
             let cipher = Aes256Gcm::new_from_slice(key).map_err(|_| AeadError::InvalidKey)?;
             let n = AesNonce::from_slice(iv);
-            cipher.decrypt(n, ciphertext)
+            cipher
+                .decrypt(n, ciphertext)
                 .map_err(|_| AeadError::DecryptFailed)
         }
         EncMode::XChaCha20Poly1305 => {
             if iv.len() != 24 {
                 return Err(AeadError::InvalidIv);
             }
-            let cipher = XChaCha20Poly1305::new_from_slice(key).map_err(|_| AeadError::InvalidKey)?;
+            let cipher =
+                XChaCha20Poly1305::new_from_slice(key).map_err(|_| AeadError::InvalidKey)?;
             let n = XNonce::from_slice(iv);
-            cipher.decrypt(n, ciphertext)
+            cipher
+                .decrypt(n, ciphertext)
                 .map_err(|_| AeadError::DecryptFailed)
         }
     }

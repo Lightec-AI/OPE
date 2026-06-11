@@ -7,10 +7,10 @@ use ml_kem::{
     MlKem768,
 };
 use ope_crypto::{encode, PublicKey};
-use rand::rngs::OsRng;
 use ope_transport::{
     load_decapsulation_key, ClientKeyExchange, MLKEM768_ENCAPSULATION_KEY_LEN, X25519_SHARE_LEN,
 };
+use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 use x25519_dalek::{PublicKey as X25519Public, StaticSecret};
 
@@ -129,7 +129,10 @@ impl EngineStaticSecret {
         let mlkem_ss = decaps.decapsulate(&ct);
         let peer = X25519Public::from(client_x25519_public);
         let x25519_ss = self.x25519_secret.diffie_hellman(&peer);
-        Ok(combine_shared_secrets(mlkem_ss.as_ref(), x25519_ss.as_bytes()))
+        Ok(combine_shared_secrets(
+            mlkem_ss.as_ref(),
+            x25519_ss.as_bytes(),
+        ))
     }
 
     /// Hybrid server step for streaming **response** to client ephemeral session.

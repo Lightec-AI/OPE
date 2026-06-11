@@ -15,5 +15,7 @@ fn mock_attester_issues_and_verifies() {
             requested_ttl_sec: 600,
         })
         .unwrap();
-    attester.verify_attestation_object(&resp.attestation).unwrap();
+    attester
+        .verify_attestation_object(&resp.attestation)
+        .unwrap();
 }

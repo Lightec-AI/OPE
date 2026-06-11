@@ -8,9 +8,9 @@ mod model;
 mod sign;
 mod verify;
 
+pub use encrypt::{decrypt_envelope, encrypt_envelope};
 pub use envelope::Envelope;
 pub use error::Error;
 pub use model::parse_routed_model;
-pub use encrypt::{decrypt_envelope, encrypt_envelope};
 pub use sign::sign_envelope;
 pub use verify::{verify_envelope, VerifyOptions};

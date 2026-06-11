@@ -6,8 +6,8 @@ use ope_crypto::{public_key_from_bytes, secret_key_from_bytes};
 use ope_envelope::{sign_envelope, verify_envelope, Envelope, VerifyOptions};
 
 use crate::error::{
-    ope_string_free, set_last_error_code, OPE_ERR_CRYPTO, OPE_ERR_INVALID_ARG, OPE_ERR_JSON,
-    OPE_ERR_INTERNAL, OPE_ERR_UTF8, OPE_ERR_VERIFY, OPE_OK,
+    ope_string_free, set_last_error_code, OPE_ERR_CRYPTO, OPE_ERR_INTERNAL, OPE_ERR_INVALID_ARG,
+    OPE_ERR_JSON, OPE_ERR_UTF8, OPE_ERR_VERIFY, OPE_OK,
 };
 
 fn parse_envelope_json(json: *const c_char) -> Result<Envelope, i32> {

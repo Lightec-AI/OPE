@@ -25,9 +25,7 @@ fn registries() -> &'static Mutex<ClientRegistries> {
 }
 
 fn lock_registries() -> std::sync::MutexGuard<'static, ClientRegistries> {
-    registries()
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
+    registries().lock().unwrap_or_else(|e| e.into_inner())
 }
 
 fn next_handle() -> u64 {
@@ -59,9 +57,7 @@ pub fn ope_wasm_client_encrypt_request(
         .map_err(|e| js_err(format!("base_envelope: {e}")))?;
 
     let session = if want_response_session {
-        Some(
-            ClientSession::generate().map_err(|e| js_err(format!("client session: {e}")))?,
-        )
+        Some(ClientSession::generate().map_err(|e| js_err(format!("client session: {e}")))?)
     } else {
         None
     };
@@ -69,8 +65,8 @@ pub fn ope_wasm_client_encrypt_request(
     encrypt_request(&mut envelope, &engine, &payload, session.as_ref())
         .map_err(|e| js_err(format!("encrypt_request: {e}")))?;
 
-    let envelope_json = serde_json::to_value(&envelope)
-        .map_err(|e| js_err(format!("envelope serialize: {e}")))?;
+    let envelope_json =
+        serde_json::to_value(&envelope).map_err(|e| js_err(format!("envelope serialize: {e}")))?;
 
     let session_handle = session.map(|s| {
         let h = next_handle();

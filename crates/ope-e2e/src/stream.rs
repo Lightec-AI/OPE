@@ -18,8 +18,7 @@ pub fn encrypt_chunk(
     seq: u32,
     plaintext: &[u8],
 ) -> Result<String, Error> {
-    let cipher = ChaCha20Poly1305::new_from_slice(key)
-        .map_err(|e| Error::Crypto(e.to_string()))?;
+    let cipher = ChaCha20Poly1305::new_from_slice(key).map_err(|e| Error::Crypto(e.to_string()))?;
     let nonce = chunk_nonce(iv_base, seq);
     let ct = cipher
         .encrypt(
@@ -40,13 +39,12 @@ pub fn decrypt_chunk(
     seq: u32,
     ciphertext_b64: &str,
 ) -> Result<Vec<u8>, Error> {
-    let ct = ope_crypto::decode(ciphertext_b64)
-        .map_err(|_| Error::E2e("chunk ciphertext".into()))?;
+    let ct =
+        ope_crypto::decode(ciphertext_b64).map_err(|_| Error::E2e("chunk ciphertext".into()))?;
     if ct.len() < TAG_LEN {
         return Err(Error::E2e("chunk too short".into()));
     }
-    let cipher = ChaCha20Poly1305::new_from_slice(key)
-        .map_err(|e| Error::Crypto(e.to_string()))?;
+    let cipher = ChaCha20Poly1305::new_from_slice(key).map_err(|e| Error::Crypto(e.to_string()))?;
     let nonce = chunk_nonce(iv_base, seq);
     cipher
         .decrypt(

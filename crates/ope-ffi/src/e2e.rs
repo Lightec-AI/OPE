@@ -24,7 +24,8 @@ use serde_json::{json, Value};
 use zeroize::ZeroizeOnDrop;
 
 use crate::error::{
-    set_last_error_code, OPE_ERR_CRYPTO, OPE_ERR_INTERNAL, OPE_ERR_INVALID_ARG, OPE_ERR_JSON, OPE_OK,
+    set_last_error_code, OPE_ERR_CRYPTO, OPE_ERR_INTERNAL, OPE_ERR_INVALID_ARG, OPE_ERR_JSON,
+    OPE_OK,
 };
 
 /// Derived response-stream key + IV. The key is zeroized on drop (SEC-028); the IV is not
@@ -97,9 +98,12 @@ fn read_str<'a>(ptr: *const c_char, name: &str) -> Result<&'a str, *mut c_char> 
     if ptr.is_null() {
         return Err(err_null(OPE_ERR_INVALID_ARG, format!("null {name}")));
     }
-    unsafe { CStr::from_ptr(ptr) }
-        .to_str()
-        .map_err(|e| err_null(crate::error::OPE_ERR_UTF8, format!("invalid utf-8 {name}: {e}")))
+    unsafe { CStr::from_ptr(ptr) }.to_str().map_err(|e| {
+        err_null(
+            crate::error::OPE_ERR_UTF8,
+            format!("invalid utf-8 {name}: {e}"),
+        )
+    })
 }
 
 fn read_json<T: serde::de::DeserializeOwned>(
@@ -403,13 +407,17 @@ mod tests {
         // Engine generates an epoch keypair.
         let engine_id = cstr("engine-ffi");
         let gen = unsafe {
-            take_json(ope_e2e_engine_generate(engine_id.as_ptr(), cstr(&ed_b64).as_ptr()))
+            take_json(ope_e2e_engine_generate(
+                engine_id.as_ptr(),
+                cstr(&ed_b64).as_ptr(),
+            ))
         };
         let engine_handle = gen["handle"].as_u64().unwrap();
         let identity = gen["identity"].clone();
 
         // Client encrypts a request (retaining a response session).
-        let payload = json!({ "model": "llama3@teechat", "messages": [{ "role": "user", "content": "hi" }] });
+        let payload =
+            json!({ "model": "llama3@teechat", "messages": [{ "role": "user", "content": "hi" }] });
         let base = json!({
             "ope_version": "1.0",
             "alg": "EdDSA",

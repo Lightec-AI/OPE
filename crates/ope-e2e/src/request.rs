@@ -12,7 +12,7 @@ use x25519_dalek::{PublicKey as X25519Public, StaticSecret};
 
 use crate::e2e_fields::E2eFields;
 use crate::identity::{ClientSession, EngineIdentity};
-use crate::kex::{derive_content_key, client_request_shared_secret, DIRECTION_REQUEST};
+use crate::kex::{client_request_shared_secret, derive_content_key, DIRECTION_REQUEST};
 use crate::Error;
 
 pub const ENC_E2E_HYBRID_PQ: &str = "e2e-hybrid-pq";
@@ -33,8 +33,7 @@ pub fn encrypt_request(
 
     let x25519_secret = StaticSecret::random_from_rng(rand::rngs::OsRng);
     let client_x25519_public = *X25519Public::from(&x25519_secret).as_bytes();
-    let (shared, mlkem_ct) =
-        client_request_shared_secret(engine, x25519_secret.to_bytes())?;
+    let (shared, mlkem_ct) = client_request_shared_secret(engine, x25519_secret.to_bytes())?;
 
     let content_key = derive_content_key(
         &shared,
@@ -46,8 +45,8 @@ pub fn encrypt_request(
 
     let mut iv = [0u8; 12];
     rand::thread_rng().fill_bytes(&mut iv);
-    let cipher = ChaCha20Poly1305::new_from_slice(&content_key)
-        .map_err(|e| Error::Crypto(e.to_string()))?;
+    let cipher =
+        ChaCha20Poly1305::new_from_slice(&content_key).map_err(|e| Error::Crypto(e.to_string()))?;
     let nonce = Nonce::from(iv);
     let ct = cipher
         .encrypt(&nonce, plaintext.as_ref())
@@ -85,8 +84,7 @@ pub fn decrypt_request(
     .map_err(|e| Error::E2e(e.to_string()))?;
 
     let mlkem_ct = decode(
-        e2e
-            .mlkem_ciphertext
+        e2e.mlkem_ciphertext
             .as_ref()
             .ok_or_else(|| Error::E2e("missing mlkem_ciphertext".into()))?,
     )
@@ -117,8 +115,8 @@ pub fn decrypt_request(
     let ct = decode(ct_b64).map_err(|_| Error::E2e("ct".into()))?;
     let iv_arr: [u8; 12] = iv.try_into().map_err(|_| Error::E2e("iv len".into()))?;
 
-    let cipher = ChaCha20Poly1305::new_from_slice(&content_key)
-        .map_err(|e| Error::Crypto(e.to_string()))?;
+    let cipher =
+        ChaCha20Poly1305::new_from_slice(&content_key).map_err(|e| Error::Crypto(e.to_string()))?;
     let nonce = Nonce::from(iv_arr);
     let plaintext = cipher
         .decrypt(&nonce, ct.as_ref())

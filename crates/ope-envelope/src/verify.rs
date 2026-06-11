@@ -6,8 +6,8 @@ use ope_crypto::{decode, verify, PublicKey};
 
 use crate::canonical::{payload_hash, signing_bytes};
 use crate::encrypt::decrypt_envelope;
-use crate::model::parse_routed_model;
 use crate::envelope::Envelope;
+use crate::model::parse_routed_model;
 use crate::Error;
 
 #[derive(Debug, Clone, Default)]
@@ -79,8 +79,8 @@ pub fn verify_envelope(
     let message = signing_bytes(envelope)?;
     verify(public, &message, &sig_arr).map_err(|_| Error::InvalidSignature)?;
 
-    let is_opaque_e2e = envelope.enc == crate::envelope::Envelope::ENC_E2E_HYBRID_PQ
-        && options.opaque_e2e;
+    let is_opaque_e2e =
+        envelope.enc == crate::envelope::Envelope::ENC_E2E_HYBRID_PQ && options.opaque_e2e;
 
     let payload_for_hash = if envelope.enc == crate::envelope::Envelope::ENC_NONE {
         envelope.payload.clone()
@@ -111,10 +111,14 @@ pub fn verify_envelope(
             if let Some(model) = meta.get("model").and_then(|m| m.as_str()) {
                 parse_routed_model(model)?;
             } else {
-                return Err(Error::InvalidModelId("meta.model missing for opaque e2e".into()));
+                return Err(Error::InvalidModelId(
+                    "meta.model missing for opaque e2e".into(),
+                ));
             }
         } else {
-            return Err(Error::InvalidModelId("meta.model missing for opaque e2e".into()));
+            return Err(Error::InvalidModelId(
+                "meta.model missing for opaque e2e".into(),
+            ));
         }
     }
 

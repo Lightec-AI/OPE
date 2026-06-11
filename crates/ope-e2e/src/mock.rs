@@ -26,13 +26,9 @@ pub fn mock_engine_from_seed(seed: &[u8; 32]) -> (EngineStaticSecret, EngineIden
         s
     };
     let ed = mock_keypair_from_seed(seed);
-    let secret = EngineStaticSecret::from_bytes(
-        "engine-dev",
-        &decaps_bytes,
-        x25519_secret,
-        ed.public,
-    )
-    .expect("mock engine");
+    let secret =
+        EngineStaticSecret::from_bytes("engine-dev", &decaps_bytes, x25519_secret, ed.public)
+            .expect("mock engine");
     let identity = secret.public_identity().expect("mock identity");
     (secret, identity)
 }

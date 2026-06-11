@@ -57,7 +57,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .parent()
                     .unwrap_or(std::path::Path::new("spec/vectors")),
             )?;
-            println!("Regenerated vectors in {}", vector.parent().unwrap().display());
+            println!(
+                "Regenerated vectors in {}",
+                vector.parent().unwrap().display()
+            );
         }
         Commands::GenVectors { dir } => {
             vectors::write_all_vectors(&dir)?;
@@ -116,15 +119,14 @@ fn cmd_transport_test() -> Result<(), Box<dyn std::error::Error>> {
     let (server, server_ss) = ServerKeyExchange::respond_to(&client)?;
     let client_ss = client_shared_secret(&client, &server)?;
     assert_eq!(client_ss, server_ss);
-    println!(
-        "OK: X25519MLKEM768 shared secret {} bytes",
-        client_ss.len()
-    );
+    println!("OK: X25519MLKEM768 shared secret {} bytes", client_ss.len());
     Ok(())
 }
 
 fn cmd_hkdf_test() -> Result<(), Box<dyn std::error::Error>> {
-    use ope_transport::{client_shared_secret, derive_record_keys, ClientKeyExchange, ServerKeyExchange};
+    use ope_transport::{
+        client_shared_secret, derive_record_keys, ClientKeyExchange, ServerKeyExchange,
+    };
 
     let client = ClientKeyExchange::generate()?;
     let (server, _) = ServerKeyExchange::respond_to(&client)?;
@@ -182,7 +184,8 @@ fn cmd_e2e_test() -> Result<(), Box<dyn std::error::Error>> {
     let decrypted = decrypt_request(&envelope, &engine_secret)?;
     assert_eq!(decrypted, payload);
 
-    let (resp_key, iv, server) = begin_response_session(&engine_secret, &envelope, &client_session)?;
+    let (resp_key, iv, server) =
+        begin_response_session(&engine_secret, &envelope, &client_session)?;
     let chunk = encrypt_response_chunk(&resp_key, &iv, 0, b"stream-token")?;
     let pt = decrypt_response_chunk(
         &envelope,

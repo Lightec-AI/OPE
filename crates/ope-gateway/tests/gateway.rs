@@ -2,7 +2,9 @@ use std::collections::HashSet;
 use std::time::Duration;
 
 use ope_attest::VerifyEnvelopeRequest;
-use ope_gateway::{normalize_payload_for_provider, strip_provider_suffix, verify_envelope_request, GatewayConfig};
+use ope_gateway::{
+    normalize_payload_for_provider, strip_provider_suffix, verify_envelope_request, GatewayConfig,
+};
 use serde_json::json;
 
 #[test]

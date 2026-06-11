@@ -84,7 +84,13 @@ pub fn derive_request_content_key(
     let x25519_secret = StaticSecret::random_from_rng(OsRng);
     let x25519_public = *X25519Public::from(&x25519_secret).as_bytes();
     let (shared, mlkem_ct) = client_request_shared_secret(engine, x25519_secret.to_bytes())?;
-    let key = derive_content_key(&shared, DIRECTION_REQUEST, &engine.engine_id, kid, envelope_nonce)?;
+    let key = derive_content_key(
+        &shared,
+        DIRECTION_REQUEST,
+        &engine.engine_id,
+        kid,
+        envelope_nonce,
+    )?;
     Ok((key, x25519_public, mlkem_ct))
 }
 
@@ -101,8 +107,8 @@ pub fn derive_response_content_key(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::DEV_ENGINE_SEED;
     use crate::identity::ClientSession;
+    use crate::mock::DEV_ENGINE_SEED;
 
     #[test]
     fn request_static_roundtrip() {
@@ -111,9 +117,8 @@ mod tests {
         let client_x25519_secret = [0x33u8; 32];
         let (shared, mlkem_ct) =
             client_request_shared_secret(&engine_pub, client_x25519_secret).unwrap();
-        let client_x25519_public = x25519_dalek::PublicKey::from(&StaticSecret::from(
-            client_x25519_secret,
-        ));
+        let client_x25519_public =
+            x25519_dalek::PublicKey::from(&StaticSecret::from(client_x25519_secret));
         let server_shared = engine_secret
             .request_shared_secret(&mlkem_ct, *client_x25519_public.as_bytes())
             .unwrap();

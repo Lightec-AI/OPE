@@ -103,11 +103,7 @@ pub fn verify_envelope_request(
             Err(ope_envelope::Error::InvalidModelId(_)) => "ope_invalid_model_id",
             _ => "ope_verification_failed",
         };
-        return Ok(deny_verdict(
-            code,
-            "envelope verification failed",
-            checks,
-        ));
+        return Ok(deny_verdict(code, "envelope verification failed", checks));
     }
 
     seen_nonces.insert((envelope.kid.clone(), envelope.nonce.clone()));
@@ -118,8 +114,8 @@ pub fn verify_envelope_request(
             .attestation
             .as_ref()
             .ok_or_else(|| GatewayError::InvalidRequest("attestation required".into()))?;
-        let att: Attestation =
-            serde_json::from_value(att_val.clone()).map_err(|e| GatewayError::InvalidRequest(e.to_string()))?;
+        let att: Attestation = serde_json::from_value(att_val.clone())
+            .map_err(|e| GatewayError::InvalidRequest(e.to_string()))?;
         att_ok = verify_attestation(&att, &MockAttester::keypair().public).is_ok()
             && att.kid == envelope.kid;
         if att.recipient.is_some() && att.recipient.as_deref() != Some(&config.gateway_id) {
