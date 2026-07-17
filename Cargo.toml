@@ -19,7 +19,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
-repository = "https://github.com/ClawBay/OPE"
+repository = "https://github.com/Lightec-AI/OPE"
 rust-version = "1.85"
 
 [workspace.dependencies]
@@ -44,10 +44,11 @@ uuid = { version = "1", features = ["v4"] }
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 
 ope-attest = { path = "crates/ope-attest" }
-ope-crypto = { path = "crates/ope-crypto" }
-ope-envelope = { path = "crates/ope-envelope" }
+# version= is required so `cargo publish` rewrites path deps to crates.io versions.
+ope-crypto = { path = "crates/ope-crypto", version = "0.1.0" }
+ope-envelope = { path = "crates/ope-envelope", version = "0.1.0" }
 ope-gateway = { path = "crates/ope-gateway" }
 ope-http = { path = "crates/ope-http" }
 ope-server = { path = "crates/ope-server" }
-ope-transport = { path = "crates/ope-transport" }
-ope-e2e = { path = "crates/ope-e2e" }
+ope-transport = { path = "crates/ope-transport", version = "0.1.0" }
+ope-e2e = { path = "crates/ope-e2e", version = "0.1.0" }

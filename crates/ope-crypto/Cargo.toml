@@ -4,6 +4,8 @@ description = "OPE cryptographic primitives (Ed25519, hashing, base64url)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+readme = "../../README.md"
 rust-version.workspace = true
 
 [dependencies]

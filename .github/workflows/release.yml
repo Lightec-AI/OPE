@@ -1,9 +1,22 @@
-# Tag release: build measured ope-ffi (libope_ffi.so), record SHA256SUMS.
+# Tag release: build measured artifacts, publish to crates.io + npm, attach GitHub assets.
 #
-# Clients and TeaChat engine attestation bind engine.binary_sha256 /
-# ope.libope_ffi_sha256 to this release (see TeaChat config/ope-version.json).
+# Artifacts
+# - libope_ffi.so       — Linux cdylib (engine/gateway Node). Hard-gated attestation hash.
+# - ope_wasm_bg.wasm    — browser/mobile WASM (also published as @teechat/ope-wasm on npm).
+# - SHA256SUMS / RELEASE_MANIFEST.json
+#
+# Registries (require repo secrets)
+# - CARGO_REGISTRY_TOKEN — crates.io API token; publishes ope-crypto → ope-envelope +
+#   ope-transport → ope-e2e (dependency order).
+# - NPM_TOKEN            — npm automation token with publish rights on the `teechat` org;
+#   publishes @teechat/ope-wasm.
 #
 # Tag with OPE semver (e.g. v0.1.0) — independent of InferenceEngine train tags.
+#
+# First cut / re-cut checklist:
+# 1. Confirm npm org `teechat` exists and the token can publish @teechat/*.
+# 2. Add CARGO_REGISTRY_TOKEN + NPM_TOKEN as Actions secrets on Lightec-AI/OPE.
+# 3. Push this workflow, then `git tag -f v0.1.0 <commit> && git push -f origin v0.1.0`.
 
 name: Release
 
@@ -25,34 +38,69 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: Build libope_ffi.so
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build libope_ffi.so + @teechat/ope-wasm
         run: |
           set -euo pipefail
+          mkdir -p dist dist/ope-wasm
+
+          # Native FFI (measured / hard-gated).
           cargo build -p ope-ffi --release
           SO="target/release/libope_ffi.so"
           test -f "$SO"
-          mkdir -p dist
           cp -a "$SO" dist/libope_ffi.so
+
+          # Browser/mobile WASM — scoped package name for npm (@teechat/ope-wasm).
+          wasm-pack build crates/ope-wasm --target web --release \
+            --scope teechat \
+            --out-dir "$PWD/dist/ope-wasm" --out-name ope_wasm
+          WASM="dist/ope-wasm/ope_wasm_bg.wasm"
+          test -f "$WASM"
+          test -f dist/ope-wasm/package.json
+          # wasm-pack --scope teechat emits name "@teechat/ope-wasm".
+          node -e 'const p=require("./dist/ope-wasm/package.json"); if(p.name!=="@teechat/ope-wasm"){console.error(p); process.exit(1)}'
+
           (
             cd dist
-            sha256sum libope_ffi.so | tee SHA256SUMS
+            sha256sum libope_ffi.so ope-wasm/ope_wasm_bg.wasm | tee SHA256SUMS
           )
-          OPE_SHA="$(awk '{print $1}' dist/SHA256SUMS)"
+          OPE_FFI_SHA="$(awk '/libope_ffi\.so$/ {print $1}' dist/SHA256SUMS)"
+          OPE_WASM_SHA="$(awk '/ope_wasm_bg\.wasm$/ {print $1}' dist/SHA256SUMS)"
           OPE_GIT="$(git rev-parse HEAD)"
           VERSION="${GITHUB_REF_NAME#v}"
-          python3 - "$OPE_SHA" "$OPE_GIT" "$VERSION" "$GITHUB_REF_NAME" <<'PY'
+
+          # Package the wasm bundle (wasm + js glue + d.ts) for GitHub consumers.
+          tar -C dist/ope-wasm -czf dist/ope-wasm.tar.gz .
+
+          python3 - "$OPE_FFI_SHA" "$OPE_WASM_SHA" "$OPE_GIT" "$VERSION" "$GITHUB_REF_NAME" <<'PY'
           import json, sys
-          ope_sha, ope_git, version, tag = sys.argv[1:5]
+          ope_ffi_sha, ope_wasm_sha, ope_git, version, tag = sys.argv[1:6]
           doc = {
             "schema": "teechat-ope-release/v1",
             "version": version,
             "tag": tag,
             "gitSha": ope_git,
-            "libopeFfiSha256": ope_sha,
-            "notes": "Measured artifact is libope_ffi.so (attestation engine.binary_sha256 / ope.libope_ffi_sha256).",
+            "libopeFfiSha256": ope_ffi_sha,
+            "opeWasmSha256": ope_wasm_sha,
+            "npmPackage": "@teechat/ope-wasm",
+            "crateVersion": version,
+            "notes": (
+              "Measured artifact is libope_ffi.so (attestation engine.binary_sha256 / "
+              "ope.libope_ffi_sha256). Browser/mobile clients consume @teechat/ope-wasm "
+              "from npm; ope_wasm_bg.wasm is also attached here for transparency."
+            ),
           }
           open("dist/RELEASE_MANIFEST.json", "w", encoding="utf-8").write(
             json.dumps(doc, indent=2) + "\n"
@@ -63,20 +111,108 @@ jobs:
           echo "----- RELEASE_MANIFEST.json -----"
           cat dist/RELEASE_MANIFEST.json
 
+      - name: Publish crates.io (ope-crypto → envelope/transport → e2e)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${CARGO_REGISTRY_TOKEN:-}" ]]; then
+            echo "!! CARGO_REGISTRY_TOKEN secret is not set — cannot publish crates.io" >&2
+            exit 1
+          fi
+
+          publish_crate() {
+            local crate="$1"
+            local attempt
+            for attempt in $(seq 1 12); do
+              echo ">> cargo publish -p ${crate} (attempt ${attempt})"
+              set +e
+              out="$(cargo publish -p "$crate" --token "$CARGO_REGISTRY_TOKEN" 2>&1)"
+              status=$?
+              set -e
+              printf '%s\n' "$out"
+              if [[ $status -eq 0 ]]; then
+                return 0
+              fi
+              if printf '%s\n' "$out" | grep -qiE 'already (uploaded|exists)|crate.*already'; then
+                echo ">> ${crate} already on crates.io — continuing"
+                return 0
+              fi
+              # Index propagation lag after a dependency publish.
+              if printf '%s\n' "$out" | grep -qiE 'no matching package|failed to get|index'; then
+                echo ">> waiting for crates.io index (30s)…"
+                sleep 30
+                continue
+              fi
+              echo "!! cargo publish -p ${crate} failed" >&2
+              return "$status"
+            done
+            echo "!! cargo publish -p ${crate} exhausted retries" >&2
+            return 1
+          }
+
+          publish_crate ope-crypto
+          # Brief settle so dependents see ope-crypto on the index.
+          sleep 15
+          publish_crate ope-envelope
+          publish_crate ope-transport
+          sleep 15
+          publish_crate ope-e2e
+
+      - name: Publish npm (@teechat/ope-wasm)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "!! NPM_TOKEN secret is not set — cannot publish @teechat/ope-wasm" >&2
+            exit 1
+          fi
+          # Align package version with the git tag (crate workspace version is source of truth).
+          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="$VERSION" node -e '
+            const fs = require("fs");
+            const p = JSON.parse(fs.readFileSync("dist/ope-wasm/package.json", "utf8"));
+            p.version = process.env.VERSION;
+            fs.writeFileSync("dist/ope-wasm/package.json", JSON.stringify(p, null, 2) + "\n");
+            console.log("npm package", p.name, p.version);
+          '
+          cd dist/ope-wasm
+          # Idempotent: allow re-runs when the version is already published.
+          set +e
+          out="$(npm publish --access public 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$out"
+          if [[ $status -eq 0 ]]; then
+            exit 0
+          fi
+          if printf '%s\n' "$out" | grep -qiE 'cannot publish over|already exists|previously published'; then
+            echo ">> @teechat/ope-wasm@${VERSION} already on npm — continuing"
+            exit 0
+          fi
+          exit "$status"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/libope_ffi.so
+            dist/ope-wasm/ope_wasm_bg.wasm
+            dist/ope-wasm.tar.gz
             dist/SHA256SUMS
             dist/RELEASE_MANIFEST.json
           generate_release_notes: true
           body: |
-            ## Measured artifact
+            ## Artifacts
 
-            `libope_ffi.so` is the Linux cdylib used by TeeChat engine/gateway Node
-            bindings. Clients verify `engine.binary_sha256` / `ope.libope_ffi_sha256`
-            against **`SHA256SUMS`**.
+            - **`libope_ffi.so`** — Linux cdylib for TeeChat engine/gateway Node bindings.
+              Clients verify `engine.binary_sha256` / `ope.libope_ffi_sha256` against
+              **`SHA256SUMS`** (hard-gated by attestation).
+            - **`@teechat/ope-wasm`** on npm — browser/mobile WASM used by web + Capacitor.
+              Also attached here as `ope_wasm_bg.wasm` / `ope-wasm.tar.gz` for transparency.
+            - **crates.io** — `ope-crypto`, `ope-envelope`, `ope-transport`, `ope-e2e`
+              (same semver as this tag). Desktop Tauri links these statically.
 
             Tag with OPE semver (e.g. `v0.1.0`), independent of InferenceEngine trains.
         env:

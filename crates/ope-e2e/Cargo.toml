@@ -4,6 +4,8 @@ description = "OPE Confidential AI: hybrid PQ application-layer E2E encryption"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
+readme = "../../README.md"
 rust-version.workspace = true
 
 [dependencies]
