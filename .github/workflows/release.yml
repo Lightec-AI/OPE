@@ -1,0 +1,83 @@
+# Tag release: build measured ope-ffi (libope_ffi.so), record SHA256SUMS.
+#
+# Clients and TeaChat engine attestation bind engine.binary_sha256 /
+# ope.libope_ffi_sha256 to this release (see TeaChat config/ope-version.json).
+#
+# Tag with OPE semver (e.g. v0.1.0) — independent of InferenceEngine train tags.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build libope_ffi.so
+        run: |
+          set -euo pipefail
+          cargo build -p ope-ffi --release
+          SO="target/release/libope_ffi.so"
+          test -f "$SO"
+          mkdir -p dist
+          cp -a "$SO" dist/libope_ffi.so
+          (
+            cd dist
+            sha256sum libope_ffi.so | tee SHA256SUMS
+          )
+          OPE_SHA="$(awk '{print $1}' dist/SHA256SUMS)"
+          OPE_GIT="$(git rev-parse HEAD)"
+          VERSION="${GITHUB_REF_NAME#v}"
+          python3 - "$OPE_SHA" "$OPE_GIT" "$VERSION" "$GITHUB_REF_NAME" <<'PY'
+          import json, sys
+          ope_sha, ope_git, version, tag = sys.argv[1:5]
+          doc = {
+            "schema": "teechat-ope-release/v1",
+            "version": version,
+            "tag": tag,
+            "gitSha": ope_git,
+            "libopeFfiSha256": ope_sha,
+            "notes": "Measured artifact is libope_ffi.so (attestation engine.binary_sha256 / ope.libope_ffi_sha256).",
+          }
+          open("dist/RELEASE_MANIFEST.json", "w", encoding="utf-8").write(
+            json.dumps(doc, indent=2) + "\n"
+          )
+          PY
+          echo "----- SHA256SUMS -----"
+          cat dist/SHA256SUMS
+          echo "----- RELEASE_MANIFEST.json -----"
+          cat dist/RELEASE_MANIFEST.json
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/libope_ffi.so
+            dist/SHA256SUMS
+            dist/RELEASE_MANIFEST.json
+          generate_release_notes: true
+          body: |
+            ## Measured artifact
+
+            `libope_ffi.so` is the Linux cdylib used by TeeChat engine/gateway Node
+            bindings. Clients verify `engine.binary_sha256` / `ope.libope_ffi_sha256`
+            against **`SHA256SUMS`**.
+
+            Tag with OPE semver (e.g. `v0.1.0`), independent of InferenceEngine trains.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
