@@ -60,9 +60,11 @@ flowchart TB
 | L3 | **`ope-e2e`** | `spec/ope-confidential-ai.md` | **Reference** (mock engine) |
 | L1 | TLS | — | **External** (no OPE fork) |
 | L4 | `ope-gateway`, `ope-attest`, `ope-server` | §14, confidential-ai | Gateway opaque mode done |
-| L5 | `ope-ffi`, `bindings/*` | — | Envelope + hybrid E2E (`ope_e2e_*`) C ABI; WASM planned |
+| L5 | `ope-ffi`, `bindings/*`, **`packages/ope-protocol`** | — | Envelope + hybrid E2E (`ope_e2e_*`) C ABI; WASM (`@teechat/ope-wasm`); **wire types** (`@teechat/ope-protocol`) |
 
 `ope-transport` provides **X25519MLKEM768** math shared with TLS PQ drafts; production TLS uses s2n/BoringSSL directly. **Application E2E** uses `ope-e2e` HKDF labels, not TLS record keys.
+
+**Wire protocol (TypeScript):** [`packages/ope-protocol`](../packages/ope-protocol) publishes `@teechat/ope-protocol` — envelope/trust/plane path types and NDJSON stream codec. Consumed by TeeChat gateway/client and InferenceEngine (re-export shim). Not a crypto implementation.
 
 ## Cryptographic separation
 
