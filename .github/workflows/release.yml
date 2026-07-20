@@ -213,6 +213,8 @@ jobs:
             fs.writeFileSync("package.json", JSON.stringify(p, null, 2) + "\n");
             console.log("npm package", p.name, p.version);
           '
+          npm install
+          npm run build
           set +e
           out="$(npm publish --access public 2>&1)"
           status=$?

@@ -9,3 +9,4 @@ spec/vectors/transport/source/*.txt
 .vscode/
 bindings/ts/dist/
 bindings/typescript/ope-protocol/node_modules/
+bindings/typescript/ope-protocol/dist/

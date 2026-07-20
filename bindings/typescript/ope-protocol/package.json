@@ -1,6 +1,6 @@
 {
   "name": "@teechat/ope-protocol",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript binding for OPE wire protocol (Rust SoT: crates/ope-protocol). Types + NDJSON stream codec only — no crypto.",
   "type": "module",
   "license": "Apache-2.0",
@@ -9,21 +9,25 @@
     "url": "git+https://github.com/Lightec-AI/OPE.git",
     "directory": "bindings/typescript/ope-protocol"
   },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./stream": {
-      "types": "./src/stream.ts",
-      "import": "./src/stream.ts"
+      "types": "./dist/stream.d.ts",
+      "import": "./dist/stream.js"
     }
   },
   "files": [
-    "src",
+    "dist",
     "README.md"
   ],
   "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
     "test": "tsx --test src/protocol.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

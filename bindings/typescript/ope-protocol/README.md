@@ -24,4 +24,6 @@ pnpm add @teechat/ope-protocol
 | `@teechat/ope-protocol` | Envelope, trust/epoch, traffic class, engine-plane paths/headers |
 | `@teechat/ope-protocol/stream` | `application/ope+json-stream` NDJSON frames |
 
-When changing wire shapes, update **`crates/ope-protocol` first**, then this binding and its tests.
+When changing wire shapes, update **`crates/ope-protocol` first**, then this binding, bump the package version, and republish (`Publish ope-protocol` workflow or OPE `v*` release).
+
+Published artifacts are compiled **`dist/*.js` + `.d.ts`** (not raw `src/`).
