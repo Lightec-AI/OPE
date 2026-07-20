@@ -1,6 +1,6 @@
 /**
- * Shared OPE inference protocol types (gateway ↔ engine ↔ client wire contract).
- * Crypto: `@teechat/ope-wasm` / `ope-e2e`. This package is types + helpers only.
+ * TypeScript binding for `crates/ope-protocol` (Rust SoT).
+ * Wire types + helpers only — crypto is `@teechat/ope-wasm` / ope-* crates.
  */
 
 export interface EngineStartupIdentity {

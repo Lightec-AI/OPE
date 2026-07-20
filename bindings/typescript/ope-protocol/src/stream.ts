@@ -1,4 +1,4 @@
-/** OPE §7 streaming frames (NDJSON). */
+/** OPE §7 streaming frames (NDJSON) — mirrors `ope_protocol::ope_stream`. */
 
 export const CONTENT_TYPE_OPE_JSON_STREAM = "application/ope+json-stream";
 

@@ -17,7 +17,8 @@ Override library path with `OPE_LIB_PATH` (Python, TypeScript, optional for Go).
 | C++ | [`cpp/include/ope/ope.hpp`](cpp/include/ope/ope.hpp) | Thin RAII wrapper |
 | Python | [`python/`](python/) | ctypes |
 | Go | [`go/ope`](go/ope/) | cgo |
-| TypeScript / Node | [`ts/`](ts/) | koffi FFI |
+| TypeScript / Node | [`ts/`](ts/) | koffi FFI (envelope + E2E crypto) |
+| TypeScript (wire types) | [`typescript/ope-protocol`](typescript/ope-protocol/) | Pure TS binding of [`crates/ope-protocol`](../crates/ope-protocol) — no FFI |
 
 ## Quick test (after build)
 

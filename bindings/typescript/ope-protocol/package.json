@@ -1,13 +1,13 @@
 {
   "name": "@teechat/ope-protocol",
   "version": "0.1.0",
-  "description": "OPE wire protocol types and NDJSON stream codec (gateway ↔ engine ↔ client). Crypto lives in @teechat/ope-wasm / ope-* crates.",
+  "description": "TypeScript binding for OPE wire protocol (Rust SoT: crates/ope-protocol). Types + NDJSON stream codec only — no crypto.",
   "type": "module",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Lightec-AI/OPE.git",
-    "directory": "packages/ope-protocol"
+    "directory": "bindings/typescript/ope-protocol"
   },
   "exports": {
     ".": {

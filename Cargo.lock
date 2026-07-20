@@ -1064,6 +1064,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ope-protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "ope-server"
 version = "0.1.0"
 dependencies = [

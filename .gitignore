@@ -8,4 +8,4 @@ spec/vectors/transport/source/*.txt
 .idea/
 .vscode/
 bindings/ts/dist/
-packages/ope-protocol/node_modules/
+bindings/typescript/ope-protocol/node_modules/

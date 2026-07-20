@@ -5,6 +5,7 @@ members = [
     "crates/ope-envelope",
     "crates/ope-transport",
     "crates/ope-e2e",
+    "crates/ope-protocol",
     "crates/ope-http",
     "crates/ope-attest",
     "crates/ope-gateway",
@@ -52,3 +53,4 @@ ope-http = { path = "crates/ope-http" }
 ope-server = { path = "crates/ope-server" }
 ope-transport = { path = "crates/ope-transport", version = "0.1.0" }
 ope-e2e = { path = "crates/ope-e2e", version = "0.1.0" }
+ope-protocol = { path = "crates/ope-protocol", version = "0.1.0" }
