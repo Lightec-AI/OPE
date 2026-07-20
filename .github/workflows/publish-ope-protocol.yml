@@ -1,0 +1,69 @@
+# Publish @teechat/ope-protocol (TypeScript binding of crates/ope-protocol).
+# Does not rebuild FFI/WASM — safe between full OPE v* releases.
+#
+# Trigger: Actions → Publish ope-protocol → Run workflow
+# Or: gh workflow run publish-ope-protocol.yml -R Lightec-AI/OPE
+
+name: Publish ope-protocol
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "npm package version (default: package.json)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bindings/typescript/ope-protocol
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Align version (optional override)
+        if: ${{ inputs.version != '' }}
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const p = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            p.version = process.env.VERSION;
+            fs.writeFileSync("package.json", JSON.stringify(p, null, 2) + "\n");
+            console.log(p.name, p.version);
+          '
+
+      - name: Publish npm (@teechat/ope-protocol)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "!! NPM_TOKEN secret is not set" >&2
+            exit 1
+          fi
+          VERSION="$(node -p 'require("./package.json").version')"
+          set +e
+          out="$(npm publish --access public 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$out"
+          if [[ $status -eq 0 ]]; then
+            exit 0
+          fi
+          if printf '%s\n' "$out" | grep -qiE 'cannot publish over|already exists|previously published'; then
+            echo ">> @teechat/ope-protocol@${VERSION} already on npm — continuing"
+            exit 0
+          fi
+          exit "$status"

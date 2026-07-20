@@ -9,7 +9,7 @@
 # - CARGO_REGISTRY_TOKEN — crates.io API token; publishes ope-crypto → ope-envelope +
 #   ope-transport → ope-e2e (dependency order).
 # - NPM_TOKEN            — npm automation token with publish rights on the `teechat` org;
-#   publishes @teechat/ope-wasm.
+#   publishes @teechat/ope-wasm and @teechat/ope-protocol.
 #
 # Tag with OPE semver (e.g. v0.1.0) — independent of InferenceEngine train tags.
 #
@@ -95,11 +95,13 @@ jobs:
             "libopeFfiSha256": ope_ffi_sha,
             "opeWasmSha256": ope_wasm_sha,
             "npmPackage": "@teechat/ope-wasm",
+            "npmProtocolPackage": "@teechat/ope-protocol",
             "crateVersion": version,
             "notes": (
               "Measured artifact is libope_ffi.so (attestation engine.binary_sha256 / "
               "ope.libope_ffi_sha256). Browser/mobile clients consume @teechat/ope-wasm "
-              "from npm; ope_wasm_bg.wasm is also attached here for transparency."
+              "from npm; wire types consume @teechat/ope-protocol (Rust SoT: crates/ope-protocol). "
+              "ope_wasm_bg.wasm is also attached here for transparency."
             ),
           }
           open("dist/RELEASE_MANIFEST.json", "w", encoding="utf-8").write(
@@ -193,6 +195,38 @@ jobs:
           fi
           exit "$status"
 
+      - name: Publish npm (@teechat/ope-protocol)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "!! NPM_TOKEN secret is not set — cannot publish @teechat/ope-protocol" >&2
+            exit 1
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd bindings/typescript/ope-protocol
+          VERSION="$VERSION" node -e '
+            const fs = require("fs");
+            const p = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            p.version = process.env.VERSION;
+            fs.writeFileSync("package.json", JSON.stringify(p, null, 2) + "\n");
+            console.log("npm package", p.name, p.version);
+          '
+          set +e
+          out="$(npm publish --access public 2>&1)"
+          status=$?
+          set -e
+          printf '%s\n' "$out"
+          if [[ $status -eq 0 ]]; then
+            exit 0
+          fi
+          if printf '%s\n' "$out" | grep -qiE 'cannot publish over|already exists|previously published'; then
+            echo ">> @teechat/ope-protocol@${VERSION} already on npm — continuing"
+            exit 0
+          fi
+          exit "$status"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -211,6 +245,7 @@ jobs:
               **`SHA256SUMS`** (hard-gated by attestation).
             - **`@teechat/ope-wasm`** on npm — browser/mobile WASM used by web + Capacitor.
               Also attached here as `ope_wasm_bg.wasm` / `ope-wasm.tar.gz` for transparency.
+            - **`@teechat/ope-protocol`** on npm — TypeScript wire types (Rust SoT: `crates/ope-protocol`).
             - **crates.io** — `ope-crypto`, `ope-envelope`, `ope-transport`, `ope-e2e`
               (same semver as this tag). Desktop Tauri links these statically.
 

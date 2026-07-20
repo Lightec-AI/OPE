@@ -13,7 +13,8 @@ Does **not** include crypto. Use `@teechat/ope-wasm` / `ope-e2e` / `libope_ffi` 
 
 ```bash
 pnpm add @teechat/ope-protocol
-# monorepo / TeaChat: "file:vendor/ope/bindings/typescript/ope-protocol"
+# TeeChat / IE: pin the published version (same train as ope-wasm)
+# "@teechat/ope-protocol": "0.1.0"
 ```
 
 ## Exports
