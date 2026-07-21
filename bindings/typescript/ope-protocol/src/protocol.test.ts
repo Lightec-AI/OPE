@@ -7,6 +7,7 @@ import {
   parseOpeTrafficClass,
   trafficClassHeaderMetaConsistent,
   ENGINE_PLANE_PATH_INFERENCE_RESULT,
+  HEADER_OPE_DESIRED_POOL_TARGET,
 } from "./types.js";
 import { parseOpeStreamLine, isOpeStreamContentType, CONTENT_TYPE_OPE_JSON_STREAM } from "./stream.js";
 
@@ -46,5 +47,9 @@ describe("ope stream", () => {
 describe("engine plane paths", () => {
   it("exports inference result path", () => {
     assert.equal(ENGINE_PLANE_PATH_INFERENCE_RESULT, "/v1/ope/inference/result");
+  });
+
+  it("exports desired pool target header", () => {
+    assert.equal(HEADER_OPE_DESIRED_POOL_TARGET, "x-ope-desired-pool-target");
   });
 });

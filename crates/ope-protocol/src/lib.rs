@@ -256,6 +256,8 @@ pub const HEADER_OPE_CONVERSATION_ID: &str = "x-ope-conversation-id";
 pub const HEADER_OPE_REQUEST_ID: &str = "x-ope-request-id";
 pub const HEADER_OPE_SESSION_ID: &str = "x-ope-session-id";
 pub const HEADER_OPE_TRAFFIC_CLASS: &str = "x-ope-traffic-class";
+/// Gateway → engine desired pool size on work-pull responses.
+pub const HEADER_OPE_DESIRED_POOL_TARGET: &str = "x-ope-desired-pool-target";
 pub const CONTENT_TYPE_OPE_JSON: &str = "application/ope+json";
 pub const INFERENCE_PATH: &str = "/v1/ope/inference";
 

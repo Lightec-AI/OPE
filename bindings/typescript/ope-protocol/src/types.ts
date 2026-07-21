@@ -159,6 +159,11 @@ export const HEADER_OPE_REQUEST_ID = "x-ope-request-id";
 export const HEADER_OPE_SESSION_ID = "x-ope-session-id";
 /** HTTP/2 work-pull response header (lowercase for Node http2). */
 export const HEADER_OPE_TRAFFIC_CLASS = "x-ope-traffic-class";
+/**
+ * Gateway → engine hint on work-pull responses (`200` / idle `204` / drain `503`).
+ * Engine scales/drains toward this integer; missing/malformed → ignore.
+ */
+export const HEADER_OPE_DESIRED_POOL_TARGET = "x-ope-desired-pool-target";
 export const OPE_TRAFFIC_CLASS_LIVE_CHAT = "live_chat" as const;
 export const OPE_TRAFFIC_CLASS_API = "api" as const;
 export type OpeTrafficClass =
