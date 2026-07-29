@@ -163,6 +163,10 @@ pub struct OpeE2eDescriptor {
     pub server_share: Option<String>,
 }
 
+fn is_zero_u64(v: &u64) -> bool {
+    *v == 0
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UsageReport {
     pub request_id: String,
@@ -170,6 +174,9 @@ pub struct UsageReport {
     pub engine_id: String,
     pub prompt_tokens: u64,
     pub completion_tokens: u64,
+    /// Prefix-cache hit tokens (vLLM APC / planner warm). Absent/0 = no cache hit.
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
+    pub cached_tokens: u64,
     pub ts: String,
 }
 

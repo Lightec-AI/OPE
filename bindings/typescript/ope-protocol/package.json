@@ -1,6 +1,6 @@
 {
   "name": "@teechat/ope-protocol",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "TypeScript binding for OPE wire protocol (Rust SoT: crates/ope-protocol). Types + NDJSON stream codec only — no crypto.",
   "type": "module",
   "license": "Apache-2.0",

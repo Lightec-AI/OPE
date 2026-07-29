@@ -104,6 +104,8 @@ export interface UsageReport {
   engine_id: string;
   prompt_tokens: number;
   completion_tokens: number;
+  /** Prefix-cache hit tokens (vLLM APC / planner warm). Omit or 0 = no cache hit. */
+  cached_tokens?: number;
   ts: string;
 }
 
