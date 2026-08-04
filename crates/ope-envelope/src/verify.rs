@@ -125,7 +125,8 @@ pub fn verify_envelope(
     Ok(())
 }
 
-fn verify_timestamp(ts: &str, max_skew: Duration) -> Result<(), Error> {
+/// Shared with `verify_and_open` so both admission paths bound `ts` identically.
+pub(crate) fn verify_timestamp(ts: &str, max_skew: Duration) -> Result<(), Error> {
     let parsed: DateTime<Utc> = ts
         .parse()
         .map_err(|_| Error::InvalidTimestamp(format!("invalid RFC3339: {ts}")))?;

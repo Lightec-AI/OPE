@@ -8,6 +8,16 @@ repository.workspace = true
 readme = "../../README.md"
 rust-version.workspace = true
 
+[features]
+# On by default so existing consumers (ope-gateway, ope-ffi, ope-wasm) pick the
+# new surfaces up without a manifest edit; a consumer that wants the pre-RB-05
+# surface can still take `default-features = false`.
+default = ["verify-open", "transcript"]
+# RB-05: `verify_and_open` with a key resolver and an atomic replay store.
+verify-open = []
+# RB-06: signed response header plus hash-chained frames.
+transcript = []
+
 [dependencies]
 chrono = { workspace = true }
 ope-crypto = { workspace = true }
