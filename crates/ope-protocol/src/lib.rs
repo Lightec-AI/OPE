@@ -275,6 +275,10 @@ pub const HEADER_OPE_EPHEMERAL_EPOCH: &str = "x-ope-ephemeral-epoch";
 pub const HEADER_OPE_CONVERSATION_ID: &str = "x-ope-conversation-id";
 pub const HEADER_OPE_REQUEST_ID: &str = "x-ope-request-id";
 pub const HEADER_OPE_SESSION_ID: &str = "x-ope-session-id";
+/// Work-pull body kind: inference envelope (default) or attestation challenge.
+pub const HEADER_OPE_WORK_KIND: &str = "x-ope-work-kind";
+pub const OPE_WORK_KIND_INFERENCE: &str = "inference";
+pub const OPE_WORK_KIND_CHALLENGE: &str = "challenge";
 pub const HEADER_OPE_TRAFFIC_CLASS: &str = "x-ope-traffic-class";
 /// Gateway → engine desired pool size on work-pull responses.
 pub const HEADER_OPE_DESIRED_POOL_TARGET: &str = "x-ope-desired-pool-target";
@@ -287,6 +291,8 @@ pub const ENGINE_PLANE_PATH_EPHEMERAL: &str = "/v1/ope/control/ephemeral";
 pub const ENGINE_PLANE_PATH_POOL: &str = "/v1/ope/control/pool";
 pub const ENGINE_PLANE_PATH_WORK_PULL: &str = "/v1/ope/work/pull";
 pub const ENGINE_PLANE_PATH_INFERENCE_RESULT: &str = "/v1/ope/inference/result";
+/// Engine → gateway attestation challenge result POST (JSON body).
+pub const ENGINE_PLANE_PATH_CHALLENGE_RESULT: &str = "/v1/ope/challenge/result";
 
 pub const MOCK_MLKEM_ENCAP_B64URL_LEN: usize = 1184;
 
