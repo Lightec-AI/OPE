@@ -76,11 +76,24 @@ pub enum AttestationVerdict {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CpuTeeEndorsement {
+    pub vcek_der_b64: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ask_der_b64: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ark_der_b64: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crl_der_b64: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CpuTeeAttestation {
     pub kind: CpuTeeKind,
     pub quote: String,
     pub verdict: AttestationVerdict,
     pub policy_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub endorsement: Option<CpuTeeEndorsement>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -346,6 +359,7 @@ mod tests {
                 quote: "quote".into(),
                 verdict: AttestationVerdict::Pass,
                 policy_id: "teechat-cpu-tee-prod-v1".into(),
+                endorsement: None,
             },
             gpu_tee: GpuTeeAttestation {
                 kind: GpuTeeKind::NvCc,

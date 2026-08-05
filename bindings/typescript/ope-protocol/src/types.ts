@@ -40,11 +40,20 @@ export interface AttestedMtlsWorkloadIdentity {
   lib_attested_mtls_sha256: string;
 }
 
+export interface CpuTeeEndorsement {
+  vcek_der_b64: string;
+  ask_der_b64?: string;
+  ark_der_b64?: string;
+  crl_der_b64?: string;
+}
+
 export interface CpuTeeAttestation {
   kind: "tdx" | "sev-snp";
   quote: string;
   verdict: "pass" | "fail";
   policy_id: string;
+  /** Self-contained AMD/Intel chain for local verify (RB-02). */
+  endorsement?: CpuTeeEndorsement;
 }
 
 export interface GpuTeeAttestation {
@@ -159,6 +168,11 @@ export const HEADER_OPE_EPHEMERAL_EPOCH = "x-ope-ephemeral-epoch";
 export const HEADER_OPE_CONVERSATION_ID = "x-ope-conversation-id";
 export const HEADER_OPE_REQUEST_ID = "x-ope-request-id";
 export const HEADER_OPE_SESSION_ID = "x-ope-session-id";
+/** Work-pull body kind: inference envelope (default) or attestation challenge. */
+export const HEADER_OPE_WORK_KIND = "x-ope-work-kind";
+export const OPE_WORK_KIND_INFERENCE = "inference" as const;
+export const OPE_WORK_KIND_CHALLENGE = "challenge" as const;
+export type OpeWorkKind = typeof OPE_WORK_KIND_INFERENCE | typeof OPE_WORK_KIND_CHALLENGE;
 /** HTTP/2 work-pull response header (lowercase for Node http2). */
 export const HEADER_OPE_TRAFFIC_CLASS = "x-ope-traffic-class";
 /**
@@ -225,6 +239,8 @@ export const ENGINE_PLANE_PATH_POOL = "/v1/ope/control/pool";
 export const ENGINE_PLANE_PATH_WORK_PULL = "/v1/ope/work/pull";
 /** Engine → gateway inference result POST (streaming NDJSON or JSON body). */
 export const ENGINE_PLANE_PATH_INFERENCE_RESULT = "/v1/ope/inference/result";
+/** Engine → gateway attestation challenge result POST (JSON body). */
+export const ENGINE_PLANE_PATH_CHALLENGE_RESULT = "/v1/ope/challenge/result";
 
 export interface AttestedConnectRequest {
   session_id: string;
