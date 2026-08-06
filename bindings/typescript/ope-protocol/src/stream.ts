@@ -12,7 +12,14 @@ export type OpeStreamStatusPhase =
 
 export type OpeStreamFrame =
   | { ope_stream: "1.0"; server_share: string }
-  | { ope_stream: "1.0"; seq: number; ciphertext: string; final?: boolean }
+  | {
+      ope_stream: "1.0";
+      seq: number;
+      ciphertext: string;
+      final?: boolean;
+      /** RB-06 hash-chain value (base64url). Absent on legacy frames. */
+      chain?: string;
+    }
   | { ope_stream: "1.0"; type: "trailer"; usage_report?: string }
   | {
       ope_stream: "1.0";
@@ -70,6 +77,7 @@ export function parseOpeStreamLine(line: string): OpeStreamFrame | null {
         seq: j.seq,
         ciphertext: j.ciphertext,
         final: j.final === true,
+        ...(typeof j.chain === "string" ? { chain: j.chain } : {}),
       };
     }
     return null;

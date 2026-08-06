@@ -28,6 +28,9 @@ pub enum OpeStreamFrame {
         ciphertext: String,
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         final_: bool,
+        /// RB-06 hash-chain value (base64url). Absent on legacy frames.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        chain: Option<String>,
     },
     Trailer {
         ope_stream: String,
@@ -59,11 +62,22 @@ impl OpeStreamFrame {
     }
 
     pub fn ciphertext(seq: u32, ciphertext: impl Into<String>, final_: bool) -> Self {
+        Self::ciphertext_with_chain(seq, ciphertext, final_, None)
+    }
+
+    /// Ciphertext frame with an optional RB-06 `chain` value.
+    pub fn ciphertext_with_chain(
+        seq: u32,
+        ciphertext: impl Into<String>,
+        final_: bool,
+        chain: Option<String>,
+    ) -> Self {
         Self::Ciphertext {
             ope_stream: Self::VERSION.into(),
             seq,
             ciphertext: ciphertext.into(),
             final_,
+            chain,
         }
     }
 
@@ -157,10 +171,15 @@ pub fn parse_ope_stream_line(line: &str) -> Option<OpeStreamFrame> {
         obj.get("seq").and_then(|v| v.as_u64()),
         obj.get("ciphertext").and_then(|v| v.as_str()),
     ) {
-        return Some(OpeStreamFrame::ciphertext(
+        let chain = obj
+            .get("chain")
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
+        return Some(OpeStreamFrame::ciphertext_with_chain(
             seq as u32,
             ct,
             obj.get("final").and_then(|v| v.as_bool()) == Some(true),
+            chain,
         ));
     }
     None
@@ -182,16 +201,39 @@ mod tests {
         let line = String::from_utf8(encode_ope_stream_line(&frame).unwrap()).unwrap();
         assert!(line.contains("\"final\":true"));
         assert!(!line.contains("final_"));
+        assert!(!line.contains("\"chain\""));
         let parsed = parse_ope_stream_line(&line).unwrap();
         match parsed {
             OpeStreamFrame::Ciphertext {
                 seq,
                 ciphertext,
                 final_,
+                chain,
                 ..
             } => {
                 assert_eq!(seq, 3);
                 assert_eq!(ciphertext, "abc");
+                assert!(final_);
+                assert!(chain.is_none());
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn encode_parse_ciphertext_with_chain() {
+        let frame = OpeStreamFrame::ciphertext_with_chain(
+            1,
+            "ct",
+            true,
+            Some("chain-b64url".into()),
+        );
+        let line = String::from_utf8(encode_ope_stream_line(&frame).unwrap()).unwrap();
+        assert!(line.contains("\"chain\":\"chain-b64url\""));
+        let parsed = parse_ope_stream_line(&line).unwrap();
+        match parsed {
+            OpeStreamFrame::Ciphertext { chain, final_, .. } => {
+                assert_eq!(chain.as_deref(), Some("chain-b64url"));
                 assert!(final_);
             }
             other => panic!("unexpected {other:?}"),

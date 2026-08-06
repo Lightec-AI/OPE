@@ -38,6 +38,21 @@ describe("ope stream", () => {
     assert.equal(chunk && "seq" in chunk && chunk.seq, 0);
   });
 
+  it("round-trips optional chain on ciphertext frames", () => {
+    const line = JSON.stringify({
+      ope_stream: "1.0",
+      seq: 2,
+      ciphertext: "ct",
+      final: true,
+      chain: "chain-b64url",
+    });
+    const parsed = parseOpeStreamLine(line);
+    assert.ok(parsed && "ciphertext" in parsed);
+    assert.equal(parsed.seq, 2);
+    assert.equal(parsed.chain, "chain-b64url");
+    assert.equal(parsed.final, true);
+  });
+
   it("detects stream content type", () => {
     assert.equal(isOpeStreamContentType(CONTENT_TYPE_OPE_JSON_STREAM), true);
     assert.equal(isOpeStreamContentType("application/json"), false);
