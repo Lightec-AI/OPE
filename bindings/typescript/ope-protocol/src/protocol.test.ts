@@ -67,4 +67,15 @@ describe("engine plane paths", () => {
   it("exports desired pool target header", () => {
     assert.equal(HEADER_OPE_DESIRED_POOL_TARGET, "x-ope-desired-pool-target");
   });
+
+  it("exports ops_control work kind and result path", async () => {
+    const {
+      OPE_WORK_KIND_OPS_CONTROL,
+      CAPABILITY_OPS_CONTROL_V1,
+      ENGINE_PLANE_PATH_OPS_CONTROL_RESULT,
+    } = await import("./types.js");
+    assert.equal(OPE_WORK_KIND_OPS_CONTROL, "ops_control");
+    assert.equal(CAPABILITY_OPS_CONTROL_V1, "ops_control_v1");
+    assert.equal(ENGINE_PLANE_PATH_OPS_CONTROL_RESULT, "/v1/ope/ops-control/result");
+  });
 });

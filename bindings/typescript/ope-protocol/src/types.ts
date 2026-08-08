@@ -172,7 +172,14 @@ export const HEADER_OPE_SESSION_ID = "x-ope-session-id";
 export const HEADER_OPE_WORK_KIND = "x-ope-work-kind";
 export const OPE_WORK_KIND_INFERENCE = "inference" as const;
 export const OPE_WORK_KIND_CHALLENGE = "challenge" as const;
-export type OpeWorkKind = typeof OPE_WORK_KIND_INFERENCE | typeof OPE_WORK_KIND_CHALLENGE;
+/** Gateway → engine ops break-glass (pool force/drain/dial-migrate). B+C Phase 2a. */
+export const OPE_WORK_KIND_OPS_CONTROL = "ops_control" as const;
+export type OpeWorkKind =
+  | typeof OPE_WORK_KIND_INFERENCE
+  | typeof OPE_WORK_KIND_CHALLENGE
+  | typeof OPE_WORK_KIND_OPS_CONTROL;
+/** Engine connect capability: accepts {@link OPE_WORK_KIND_OPS_CONTROL} work. */
+export const CAPABILITY_OPS_CONTROL_V1 = "ops_control_v1" as const;
 /** HTTP/2 work-pull response header (lowercase for Node http2). */
 export const HEADER_OPE_TRAFFIC_CLASS = "x-ope-traffic-class";
 /**
@@ -241,6 +248,8 @@ export const ENGINE_PLANE_PATH_WORK_PULL = "/v1/ope/work/pull";
 export const ENGINE_PLANE_PATH_INFERENCE_RESULT = "/v1/ope/inference/result";
 /** Engine → gateway attestation challenge result POST (JSON body). */
 export const ENGINE_PLANE_PATH_CHALLENGE_RESULT = "/v1/ope/challenge/result";
+/** Engine → gateway ops-control result POST (JSON body). */
+export const ENGINE_PLANE_PATH_OPS_CONTROL_RESULT = "/v1/ope/ops-control/result";
 
 export interface AttestedConnectRequest {
   session_id: string;
@@ -262,6 +271,11 @@ export interface AttestedConnectRequest {
    * Reused across parallel connects in one boot or scale batch.
    */
   gateway_challenge_nonce?: string;
+  /**
+   * Optional engine capabilities (unknown values ignored by older gateways).
+   * Advertise {@link CAPABILITY_OPS_CONTROL_V1} to receive ops_control work.
+   */
+  capabilities?: string[];
 }
 
 export interface AttestedConnectResponse {
@@ -270,6 +284,36 @@ export interface AttestedConnectResponse {
   pool_target_ack?: number;
   /** Echo of {@link AttestedConnectRequest.gateway_challenge_nonce} when challenged. */
   gateway_challenge_nonce?: string;
+}
+
+/** Narrow ops verbs on attested work-pull (`x-ope-work-kind: ops_control`). */
+export type EngineOpsControlOp = "force_target" | "drain" | "migrate" | "status";
+
+export interface EngineOpsControlRequest {
+  op: EngineOpsControlOp;
+  /** Absolute desired pool size (force_target). Still clamped by engine bake max. */
+  target_size?: number;
+  /** Drain fraction 0..1 (drain). Mutually exclusive with drain_count. */
+  drain_fraction?: number;
+  /** Drain absolute idle count (drain). */
+  drain_count?: number;
+  /** Dial-migrate target gateway URL (migrate). */
+  migrate_url?: string;
+  /** Dial-migrate session fraction 0..1 (migrate). */
+  migrate_fraction?: number;
+  /** Require explicit confirm for fleet-wide / multi-session ops. */
+  confirm?: boolean;
+}
+
+export interface EngineOpsControlResult {
+  ok: boolean;
+  op: EngineOpsControlOp;
+  engine_id: string;
+  pool_target?: number;
+  live_sessions?: number;
+  draining?: number;
+  detail?: string;
+  error?: string;
 }
 
 export interface AttestedPoolResizeRequest {

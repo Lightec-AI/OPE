@@ -275,10 +275,14 @@ pub const HEADER_OPE_EPHEMERAL_EPOCH: &str = "x-ope-ephemeral-epoch";
 pub const HEADER_OPE_CONVERSATION_ID: &str = "x-ope-conversation-id";
 pub const HEADER_OPE_REQUEST_ID: &str = "x-ope-request-id";
 pub const HEADER_OPE_SESSION_ID: &str = "x-ope-session-id";
-/// Work-pull body kind: inference envelope (default) or attestation challenge.
+/// Work-pull body kind: inference envelope (default), attestation challenge, or ops control.
 pub const HEADER_OPE_WORK_KIND: &str = "x-ope-work-kind";
 pub const OPE_WORK_KIND_INFERENCE: &str = "inference";
 pub const OPE_WORK_KIND_CHALLENGE: &str = "challenge";
+/// Gateway → engine ops break-glass (pool force/drain/dial-migrate). B+C Phase 2a.
+pub const OPE_WORK_KIND_OPS_CONTROL: &str = "ops_control";
+/// Engine connect capability: accepts `ops_control` work.
+pub const CAPABILITY_OPS_CONTROL_V1: &str = "ops_control_v1";
 pub const HEADER_OPE_TRAFFIC_CLASS: &str = "x-ope-traffic-class";
 /// Gateway → engine desired pool size on work-pull responses.
 pub const HEADER_OPE_DESIRED_POOL_TARGET: &str = "x-ope-desired-pool-target";
@@ -293,6 +297,8 @@ pub const ENGINE_PLANE_PATH_WORK_PULL: &str = "/v1/ope/work/pull";
 pub const ENGINE_PLANE_PATH_INFERENCE_RESULT: &str = "/v1/ope/inference/result";
 /// Engine → gateway attestation challenge result POST (JSON body).
 pub const ENGINE_PLANE_PATH_CHALLENGE_RESULT: &str = "/v1/ope/challenge/result";
+/// Engine → gateway ops-control result POST (JSON body).
+pub const ENGINE_PLANE_PATH_OPS_CONTROL_RESULT: &str = "/v1/ope/ops-control/result";
 
 pub const MOCK_MLKEM_ENCAP_B64URL_LEN: usize = 1184;
 
@@ -309,6 +315,9 @@ pub struct AttestedConnectRequest {
     pub instance_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gateway_challenge_nonce: Option<String>,
+    /// Optional engine capabilities (unknown values ignored by older gateways).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -320,6 +329,50 @@ pub struct AttestedConnectResponse {
     pub pool_target_ack: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gateway_challenge_nonce: Option<String>,
+}
+
+/// Narrow ops verbs on attested work-pull (`x-ope-work-kind: ops_control`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EngineOpsControlOp {
+    ForceTarget,
+    Drain,
+    Migrate,
+    Status,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EngineOpsControlRequest {
+    pub op: EngineOpsControlOp,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub target_size: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub drain_fraction: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub drain_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub migrate_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub migrate_fraction: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confirm: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EngineOpsControlResult {
+    pub ok: bool,
+    pub op: EngineOpsControlOp,
+    pub engine_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pool_target: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub live_sessions: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub draining: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
