@@ -178,6 +178,52 @@ fn stale_timestamp_fails_before_any_plaintext() {
     assert_eq!(store.len(), 0);
 }
 
+/// Regression (TeeChat OpenAPI 0.10.4→0.10.5): edge `chrono_like_now` once emitted
+/// `{unix_secs}.000Z` (e.g. `1787191719.000Z`). That is not RFC3339; under
+/// `signed-only` VERIFY the engine rejects with `ope_invalid_timestamp` and clients
+/// surface timeouts. Real RFC3339 millis must pass; the unix form must fail closed
+/// before any content key is requested.
+#[test]
+fn unix_secs_dot_z_timestamp_fails_before_any_plaintext() {
+    let kp = sender();
+    let now_unix = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let bogus = format!("{now_unix}.000Z");
+    assert!(
+        bogus.parse::<chrono::DateTime<chrono::Utc>>().is_err(),
+        "precondition: {bogus} must not parse as RFC3339"
+    );
+
+    let env = sealed_request(&kp, "n-unix-ts", &bogus, json!({"a": 1}));
+    let resolver = SpyResolver::new(&kp);
+    let store = MemoryReplayStore::new();
+    let err = verify_and_open(&env, &resolver, &store, &opts()).unwrap_err();
+
+    assert_eq!(err.code(), "ope_invalid_timestamp");
+    assert!(
+        matches!(
+            &err,
+            OpenError::Envelope(ope_envelope::Error::InvalidTimestamp(msg))
+                if msg.contains("invalid RFC3339") && msg.contains(&bogus)
+        ),
+        "expected invalid RFC3339 detail, got {err:?}"
+    );
+    assert_eq!(resolver.calls(), 0, "no content key for malformed ts");
+    assert_eq!(store.len(), 0);
+}
+
+#[test]
+fn rfc3339_millis_timestamp_is_admitted() {
+    let kp = sender();
+    let env = sealed_request(&kp, "n-rfc3339", &now_rfc3339(), json!({"a": 1}));
+    let resolver = SpyResolver::new(&kp);
+    let store = MemoryReplayStore::new();
+    verify_and_open(&env, &resolver, &store, &opts()).expect("RFC3339 millis must admit");
+    assert_eq!(resolver.calls(), 1);
+}
+
 #[test]
 fn wrong_recipient_fails_before_any_plaintext() {
     let kp = sender();
